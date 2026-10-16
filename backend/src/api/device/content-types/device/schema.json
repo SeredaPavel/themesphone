@@ -1,0 +1,28 @@
+{
+  "kind": "collectionType",
+  "collectionName": "devices",
+  "info": {
+    "singularName": "device",
+    "pluralName": "devices",
+    "displayName": "Device"
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "title": {
+      "type": "string"
+    },
+    "slug": {
+      "type": "uid",
+      "targetField": "title"
+    },
+    "wallpapers": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::wallpaper.wallpaper",
+      "mappedBy": "device"
+    }
+  }
+}

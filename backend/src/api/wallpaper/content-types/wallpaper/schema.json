@@ -1,0 +1,59 @@
+{
+  "kind": "collectionType",
+  "collectionName": "wallpapers",
+  "info": {
+    "singularName": "wallpaper",
+    "pluralName": "wallpapers",
+    "displayName": "Wallpaper"
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "title": {
+      "type": "string"
+    },
+    "slug": {
+      "type": "uid",
+      "targetField": "title"
+    },
+    "description": {
+      "type": "blocks"
+    },
+    "image": {
+      "type": "media",
+      "multiple": true,
+      "allowedTypes": [
+        "images",
+        "files",
+        "videos",
+        "audios"
+      ]
+    },
+    "isFree": {
+      "type": "boolean"
+    },
+    "device": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::device.device",
+      "inversedBy": "wallpapers"
+    },
+    "categories": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::category.category",
+      "mappedBy": "wallpapers"
+    },
+    "price": {
+      "type": "biginteger",
+      "required": true
+    },
+    "downloads": {
+      "type": "biginteger",
+      "required": false,
+      "default": "0"
+    }
+  }
+}

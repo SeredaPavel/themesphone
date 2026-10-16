@@ -1,0 +1,42 @@
+# Local database
+/data_db/
+
+# Secrets and local environment
+.env
+.env.*
+*.pem
+*.key
+*.pfx
+*.p12
+
+# Dependencies and generated files
+node_modules/
+.next/
+.strapi/
+.cache/
+.tmp/
+dist/
+build/
+out/
+coverage/
+.vercel/
+*.tsbuildinfo
+*.log
+
+# Strapi uploads and exports
+/backend/public/uploads/*
+!/backend/public/uploads/.gitkeep
+/backend/exports/
+/backend/.strapi-updater.json
+/backend/.strapi-cloud.json
+
+# Editor and OS files
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Generated directory listings
+/backend/structure.txt
+/frontend/structure.txt
