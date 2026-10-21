@@ -1,10 +1,10 @@
 // src/app/auth/confirm-email/page.tsx
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
-export default function ConfirmEmailPage() {
+function ConfirmEmailContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
@@ -58,5 +58,12 @@ export default function ConfirmEmailPage() {
       {status === 'success' && <p className="text-green-600">✅ Email подтверждён! Перенаправляем...</p>}
       {status === 'error' && <p className="text-red-600">❌ Ошибка подтверждения. Попробуйте позже.</p>}
     </div>
+  );
+}
+export default function ConfirmEmailPage() {
+  return (
+    <Suspense fallback={<p>Загрузка...</p>}>
+      <ConfirmEmailContent />
+    </Suspense>
   );
 }

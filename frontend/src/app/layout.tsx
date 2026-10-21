@@ -4,6 +4,7 @@ import Header from '@/components/Header'
 import SocialButtons from '@/components/SocialButtons'
 import { CartProvider } from '@/context/CartContext'
 import { AuthProvider } from '@/context/AuthContext'
+import { Suspense } from 'react'
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -11,7 +12,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <CartProvider>
           <AuthProvider>
-            <Header />
+            <Suspense fallback={null}>
+              <Header />
+            </Suspense>
             <main>{children}</main>
             <SocialButtons />
           </AuthProvider>

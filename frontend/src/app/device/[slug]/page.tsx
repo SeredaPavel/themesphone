@@ -2,14 +2,17 @@
 import { getWallpapers } from '@/lib/api'
 import WallpaperCard from '@/components/WallpaperCard'
 
+export const dynamic = 'force-dynamic'
+
 type Props = {
-  params: { slug: string }
-  searchParams: { category?: string }
+  params: Promise<{ slug: string }>
+  searchParams: Promise<{ category?: string }>
 }
 
 export default async function DevicePage({ params, searchParams }: Props) {
-  const { slug } = params
-  const wallpapers = await getWallpapers({ device: slug, category: searchParams.category })
+  const { slug } = await params
+  const { category } = await searchParams
+  const wallpapers = await getWallpapers({ device: slug, category })
 
   return (
     <div className="p-6 bg-[var(--background)] text-[var(--foreground)]">

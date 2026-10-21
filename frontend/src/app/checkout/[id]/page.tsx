@@ -1,11 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import PaymentPopup from '@/components/PaymentPopup';
 import DownloadPopup from '@/components/DownloadPopup';
 
-export default function CheckoutPage() {
+function CheckoutContent() {
   const { id } = useParams();
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -109,5 +109,12 @@ export default function CheckoutPage() {
         onDownload={handleDownload}
       />
     </div>
+  );
+}
+export default function CheckoutPage() {
+  return (
+    <Suspense fallback={<p>Загрузка...</p>}>
+      <CheckoutContent />
+    </Suspense>
   );
 }
