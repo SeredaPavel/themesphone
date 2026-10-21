@@ -1,0 +1,86 @@
+name: Build and publish ThemesPhone images
+
+on:
+  push:
+    branches: [main, infra/docker-local, infra/ghcr-hosting]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: themesphone-images-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  images:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      PUBLIC_STRAPI_URL: https://cms.themesphone.ru
+    steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: Prepare immutable image names
+        shell: bash
+        run: |
+          set -euo pipefail
+          task_repository="${GITHUB_REPOSITORY,,}"
+          echo "BACKEND_IMAGE=ghcr.io/${task_repository}/backend:${GITHUB_SHA}" >> "$GITHUB_ENV"
+          echo "FRONTEND_IMAGE=ghcr.io/${task_repository}/frontend:${GITHUB_SHA}" >> "$GITHUB_ENV"
+
+      - name: Check shell script
+        run: bash -n deploy/smoke-images.sh
+
+      - name: Build backend
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker build --platform linux/amd64 \
+            --label "org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}" \
+            --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
+            --build-arg "STRAPI_ADMIN_BACKEND_URL=${PUBLIC_STRAPI_URL}" \
+            --tag "$BACKEND_IMAGE" ./backend
+
+      - name: Build frontend
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker build --platform linux/amd64 \
+            --label "org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}" \
+            --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
+            --build-arg "NEXT_PUBLIC_STRAPI_URL=${PUBLIC_STRAPI_URL}" \
+            --tag "$FRONTEND_IMAGE" ./frontend
+
+      - name: Check image startup against temporary PostgreSQL
+        run: bash deploy/smoke-images.sh "$BACKEND_IMAGE" "$FRONTEND_IMAGE"
+
+      - name: Log in to GHCR
+        shell: bash
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$GHCR_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+
+      - name: Publish checked images
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker push "$BACKEND_IMAGE"
+          docker push "$FRONTEND_IMAGE"
+          {
+            echo '### Checked images'
+            echo "\`$BACKEND_IMAGE\`"
+            echo "\`$FRONTEND_IMAGE\`"
+            echo ''
+            echo 'Both images passed startup checks. No VPS deployment was performed.'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Log out of GHCR
+        if: always()
+        run: docker logout ghcr.io
