@@ -3,6 +3,8 @@
 import { getWallpapers } from '@/lib/api'
 import WallpaperCard from '@/components/WallpaperCard'
 
+export const dynamic = 'force-dynamic'
+
 export default async function Home() {
   const wallpapers = await getWallpapers()
 
@@ -16,7 +18,7 @@ export default async function Home() {
             key={wallpaper.id}
             id={wallpaper.id}
             title={wallpaper.title}
-            imageUrl={`http://127.0.0.1:1337${imageUrl}`}
+            imageUrl={`${process.env.NEXT_PUBLIC_STRAPI_URL}${imageUrl}`}
             isFree={wallpaper.isFree}
             price={wallpaper.price}
             category={wallpaper.categories?.[0] ?? null}

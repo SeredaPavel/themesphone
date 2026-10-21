@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'No token' }, { status: 401 })
   }
 
-  const res = await fetch(`${process.env.NEXT_PUBLIC_STRAPI_URL}/api/users/me`, {
+  const res = await fetch(`${process.env.STRAPI_API_URL || process.env.NEXT_PUBLIC_STRAPI_URL}/api/users/me`, {
     headers: { Authorization: `Bearer ${token}` }
   })
 

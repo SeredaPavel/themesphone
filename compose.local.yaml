@@ -1,0 +1,81 @@
+name: themesphone-local
+
+services:
+  db:
+    image: postgres:17.2-bookworm
+    environment:
+      POSTGRES_USER: ${DATABASE_USERNAME:?DATABASE_USERNAME is required}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:?DATABASE_PASSWORD is required}
+      POSTGRES_DB: ${DATABASE_NAME:?DATABASE_NAME is required}
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", 'pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  backend:
+    image: themesphone-backend:local
+    build:
+      context: ./backend
+      args:
+        STRAPI_ADMIN_BACKEND_URL: http://localhost:1338
+    env_file:
+      - ./backend/.env
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: "1337"
+      DATABASE_CLIENT: postgres
+      DATABASE_HOST: db
+      DATABASE_PORT: "5432"
+      DATABASE_SSL: "false"
+      STRAPI_ADMIN_BACKEND_URL: http://localhost:1338
+      PUBLIC_URL: http://localhost:1338
+      STRAPI_TELEMETRY_DISABLED: "true"
+    ports:
+      - "127.0.0.1:1338:1337"
+    volumes:
+      - ./.local/uploads:/app/public/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:1337/_health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      start_period: 90s
+      retries: 12
+
+  frontend:
+    image: themesphone-frontend:local
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_STRAPI_URL: http://localhost:1338
+    env_file:
+      - ./frontend/.env
+    environment:
+      NODE_ENV: production
+      HOSTNAME: 0.0.0.0
+      PORT: "3000"
+      STRAPI_API_URL: http://backend:1337
+      NEXT_PUBLIC_STRAPI_URL: http://localhost:1338
+      FRONTEND_URL: http://localhost:3001
+    ports:
+      - "127.0.0.1:3001:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 10s
+      start_period: 30s
+      retries: 5
+
+volumes:
+  postgres_data:

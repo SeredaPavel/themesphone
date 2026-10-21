@@ -45,16 +45,3 @@ export default async function DevicePage({ params, searchParams }: Props) {
     </div>
   )
 }
-
-export async function generateStaticParams() {
-  const res = await fetch('http://127.0.0.1:1337/api/devices?fields[0]=slug')
-  const data = await res.json()
-
-  const devices = data?.data || []
-
-  return devices
-    .filter((item: any) => item?.attributes?.slug)
-    .map((item: any) => ({
-      slug: item.attributes.slug,
-    }))
-}

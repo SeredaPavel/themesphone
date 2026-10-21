@@ -11,7 +11,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const strapiRes = await fetch(`${process.env.NEXT_PUBLIC_STRAPI_URL}/api/auth/email-confirmation`, {
+    const strapiRes = await fetch(`${process.env.STRAPI_API_URL || process.env.NEXT_PUBLIC_STRAPI_URL}/api/auth/email-confirmation`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ confirmation }),

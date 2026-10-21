@@ -40,3 +40,6 @@ Desktop.ini
 # Generated directory listings
 /backend/structure.txt
 /frontend/structure.txt
+
+# Isolated local Docker data
+/.local/

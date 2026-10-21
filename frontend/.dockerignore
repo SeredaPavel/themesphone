@@ -1,0 +1,17 @@
+node_modules
+.git
+.env
+.env.*
+.next
+.strapi
+.cache
+.tmp
+dist
+build
+coverage
+*.log
+*.pem
+*.key
+*.pfx
+*.p12
+structure.txt
