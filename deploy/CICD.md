@@ -1,8 +1,8 @@
-# ThemesPhone deployment to the private VPS preview
+# ThemesPhone deployment
 
 Workflow: `.github/workflows/images.yml`.
 
-- Working branches `infra/docker-local` and `infra/ghcr-hosting`: validate scripts, build,
+- Working branches `infra/docker-local`, `infra/ghcr-hosting` and `infra/public-access`: validate scripts, build,
   check startup, publish SHA-tagged images; no deployment.
 - Push to main: the same checks and publication, then restricted SSH deployment.
 - Manual main run: deploy only if the `deploy` input is enabled.
@@ -75,3 +75,24 @@ renewal, restart only the preview Caddy to reload static certificates if needed.
 is still a placeholder. Before a future public launch, update the deployment route checks,
 remove the internal preview alias/container when appropriate, and remove the marked Windows
 hosts block (preserve other hosts entries). Do not open the known unfinished endpoints first.
+
+## Public access
+
+See [PUBLIC.md](PUBLIC.md) for the preserved baseline and every temporary restriction.
+The installed deployment checker supports `access-mode`: absent/`preview` checks the
+private listener and public 503; `public` checks the normal HTTPS listener, public
+API restrictions, Strapi health and the other two sites. Publication switches this
+file automatically. Future main pushes use public checks without the preview container.
+
+Before publication install the updated `deploy-themesphone.sh` separately (back up
+the installed file first), then deploy the checked release in preview mode. Run
+`publish-public.sh` with the Caddy snippet beside it. It validates a candidate,
+backs up the live Caddyfile and mode, replaces only the ThemesPhone placeholder,
+checks HTTPS, removes the preview container/alias, then checks HTTPS again. Failure
+restores the placeholder/mode and, if stopped, restarts the preview. It does not
+change application data. Inspect stderr if a restoration command itself fails.
+
+Public deployment requires the frontend image label
+`org.themesphone.public-proxy-ready=1`; this marks the updated frontend baseline,
+not application-level enforcement. Caddy supplies the restrictions. Do not expose
+container ports or route another public hostname directly to the apps.

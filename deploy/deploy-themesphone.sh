@@ -30,18 +30,16 @@ check_files() {
     compose config --quiet </dev/null
 }
 
-if [[ "$request" == check ]]; then
-    check_files
-    echo 'READY: ThemesPhone deployment access works.'
-    exit 0
-fi
-if [[ ! "$request" =~ ^deploy\ ([a-f0-9]{40})$ ]]; then
+if [[ "$request" != check && ! "$request" =~ ^deploy\ ([a-f0-9]{40})$ ]]; then
     echo "Denied: expected 'check' or 'deploy <40-character commit SHA>'." >&2
     exit 64
 fi
-release_sha=${BASH_REMATCH[1]}
-exec 9>/run/lock/themesphone-deploy.lock
-flock -n 9 || { echo 'Another ThemesPhone deployment is running.' >&2; exit 75; }
+release_sha=${BASH_REMATCH[1]:-}
+access_mode=preview
+if [[ -f "$deployment_dir/access-mode" ]]; then
+    access_mode=$(cat "$deployment_dir/access-mode")
+fi
+[[ "$access_mode" == preview || "$access_mode" == public ]] || { echo 'Invalid access-mode.' >&2; exit 65; }
 
 http_status() {
     local expected=$1 host=$2 path=$3 mode=$4 actual
@@ -60,16 +58,36 @@ http_status() {
 }
 verify_routes() {
     local host
-    for host in themesphone.ru www.themesphone.ru themesphone.com www.themesphone.com; do
-        http_status 200 "$host" / preview || return 1
-        http_status 503 "$host" / public || return 1
-    done
-    http_status 200 cms.themesphone.ru /admin preview || return 1
-    http_status 204 cms.themesphone.ru /_health preview || return 1
-    http_status 503 cms.themesphone.ru / public || return 1
+    if [[ "$access_mode" == public ]]; then
+        for host in themesphone.ru www.themesphone.ru themesphone.com www.themesphone.com; do
+            http_status 200 "$host" / public || return 1
+            http_status 410 "$host" /api/download public || return 1
+        done
+        http_status 200 cms.themesphone.ru /admin public || return 1
+        http_status 204 cms.themesphone.ru /_health public || return 1
+        http_status 410 cms.themesphone.ru /api/users public || return 1
+        http_status 410 cms.themesphone.ru /api/orders public || return 1
+    else
+        for host in themesphone.ru www.themesphone.ru themesphone.com www.themesphone.com; do
+            http_status 200 "$host" / preview || return 1
+            http_status 503 "$host" / public || return 1
+        done
+        http_status 200 cms.themesphone.ru /admin preview || return 1
+        http_status 204 cms.themesphone.ru /_health preview || return 1
+        http_status 503 cms.themesphone.ru / public || return 1
+    fi
     http_status 200 geoconverter.ru / public || return 1
     http_status 200 profitsite.ru / public || return 1
 }
+if [[ "$request" == check ]]; then
+    check_files
+    verify_routes
+    echo 'READY: ThemesPhone deployment access works.'
+    exit 0
+fi
+exec 9>/run/lock/themesphone-deploy.lock
+flock -n 9 || { echo 'Another ThemesPhone deployment is running.' >&2; exit 75; }
+
 cleanup() {
     [[ -z "$candidate" ]] || rm -f -- "$candidate"
 }
@@ -142,6 +160,10 @@ for service in backend frontend; do
     image="ghcr.io/seredapavel/themesphone/$service:$release_sha"
     revision=$(docker image inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "$image" </dev/null)
     [[ "$revision" == "$release_sha" ]]
+    if [[ "$access_mode" == public && "$image" == */frontend:* ]]; then
+        catalogue=$(docker image inspect --format '{{ index .Config.Labels "org.themesphone.public-proxy-ready" }}' "$image" </dev/null)
+        [[ "$catalogue" == 1 ]] || { echo 'Public deployment requires public-proxy-ready images.' >&2; exit 1; }
+    fi
 done
 
 install -d -m 0700 "$backup_root" "$deployment_dir/releases"

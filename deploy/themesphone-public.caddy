@@ -1,0 +1,43 @@
+# Application source and UI are preserved. Temporary PUBLIC restrictions live here.
+themesphone.ru, www.themesphone.ru, themesphone.com, www.themesphone.com {
+    encode zstd gzip
+    header {
+        X-Frame-Options "DENY"
+        X-Content-Type-Options "nosniff"
+        Referrer-Policy "strict-origin-when-cross-origin"
+    }
+    route {
+        respond /healthz "OK" 200
+        @top {
+            method GET HEAD
+            path /api/top-wallpapers
+        }
+        reverse_proxy @top themesphone-frontend:3000
+        @unfinished path /api /api/*
+        header @unfinished Content-Type "application/json; charset=utf-8"
+        respond @unfinished `{"error":"Функция временно недоступна: сайт в разработке."}` 410
+        reverse_proxy themesphone-frontend:3000
+    }
+}
+
+cms.themesphone.ru {
+    encode zstd gzip
+    header {
+        X-Robots-Tag "noindex, nofollow"
+        X-Content-Type-Options "nosniff"
+    }
+    route {
+        respond /healthz "OK" 200
+        @catalogue {
+            method GET HEAD
+            path /api/wallpapers /api/wallpapers/* /api/categories /api/categories/* /api/devices /api/devices/*
+        }
+        reverse_proxy @catalogue themesphone-backend:1337
+        @other_api path /api /api/*
+        header @other_api Content-Type "application/json; charset=utf-8"
+        respond @other_api `{"error":"Функция временно недоступна: сайт в разработке."}` 410
+        @docs path /documentation /documentation/*
+        respond @docs "Not available" 404
+        reverse_proxy themesphone-backend:1337
+    }
+}

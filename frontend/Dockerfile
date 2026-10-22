@@ -11,6 +11,7 @@ ENV NODE_ENV=production
 RUN npm run build
 
 FROM node:22-bookworm-slim AS runner
+LABEL org.themesphone.public-proxy-ready="1"
 WORKDIR /app
 ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 HOSTNAME=0.0.0.0 PORT=3000
 COPY --from=builder --chown=node:node /app/.next/standalone ./

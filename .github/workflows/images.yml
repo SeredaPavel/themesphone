@@ -2,7 +2,7 @@ name: Build and publish ThemesPhone images
 
 on:
   push:
-    branches: [main, infra/docker-local, infra/ghcr-hosting]
+    branches: [main, infra/docker-local, infra/ghcr-hosting, infra/public-access]
   workflow_dispatch:
     inputs:
       deploy:
@@ -31,7 +31,14 @@ jobs:
         with:
           persist-credentials: false
       - name: Check shell syntax
-        run: bash -n deploy/deploy-themesphone.sh deploy/install-actions-key.sh deploy/smoke-images.sh deploy/setup-preview.sh
+        run: bash -n deploy/deploy-themesphone.sh deploy/install-actions-key.sh deploy/smoke-images.sh deploy/setup-preview.sh deploy/publish-public.sh
+      - name: Check public Caddy routing without application secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm --entrypoint /bin/cat caddy:2.11.7-alpine /usr/bin/caddy > "$RUNNER_TEMP/themesphone-caddy"
+          chmod 700 "$RUNNER_TEMP/themesphone-caddy"
+          python3 deploy/tests/test_public_proxy.py "$RUNNER_TEMP/themesphone-caddy"
       - name: Check deployment transitions and key preservation
         run: sudo python3 deploy/tests/test_deploy.py
 
@@ -108,7 +115,7 @@ jobs:
         run: docker logout ghcr.io
 
   deploy:
-    name: Deploy ThemesPhone to private preview
+    name: Deploy ThemesPhone
     needs: [check_deploy_scripts, images]
     if: >-
       github.ref == 'refs/heads/main' &&

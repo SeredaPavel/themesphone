@@ -18,8 +18,12 @@ scenario = os.environ.get('SCENARIO', 'success')
 with (base / 'docker-calls').open('a') as f:
     f.write(json.dumps(args) + '\n')
 if args[0] == 'info': sys.exit(0)
+if args[0] == 'exec':
+    if scenario == 'promotion_validate_failure' and 'validate' in args: sys.exit(9)
+    if scenario == 'promotion_reload_failure' and 'reload' in args and 'reverse_proxy' in (base / 'edge/Caddyfile').read_text(): sys.exit(9)
+    sys.exit(0)
 if args[:2] == ['image', 'inspect']:
-    print('wrong-revision' if scenario == 'bad_revision' else 'b' * 40)
+    print(('0' if scenario == 'unsafe_image' else '1') if 'public-proxy-ready' in ' '.join(args) else ('wrong-revision' if scenario == 'bad_revision' else 'b' * 40))
     sys.exit(0)
 if args[0] == 'inspect':
     service = 'backend' if args[-1] == 'backend-id' else 'frontend'
@@ -38,6 +42,10 @@ if 'exec' in args and any('pg_dump' in a for a in args):
 if 'exec' in args and 'pg_restore' in args:
     data = sys.stdin.buffer.read()
     sys.exit(0 if data.startswith(b'PGDMP') and scenario != 'dump_list_failure' else 12)
+if 'down' in args: (base / 'preview-stopped').touch()
+if 'up' in args and '--env-file' not in args:
+    (base / 'preview-restarted').touch()
+    sys.exit(0)
 if 'up' in args:
     envpath = pathlib.Path(args[args.index('--env-file') + 1])
     tag = next(s.split('=', 1)[1] for s in envpath.read_text().splitlines() if s.startswith('IMAGE_TAG='))
@@ -51,14 +59,20 @@ import os, pathlib, sys
 base = pathlib.Path(os.environ['FIXTURE'])
 scenario = os.environ.get('SCENARIO', 'success')
 new = 'IMAGE_TAG=' + 'b' * 40 in (base / 'deployment/.env').read_text()
-preview = '--connect-to' in sys.argv
+preview = any(':9443' in arg for arg in sys.argv)
 url = sys.argv[-1]
+mode_file = base / 'deployment/access-mode'
+public_mode = mode_file.exists() and mode_file.read_text().strip() == 'public'
 code = '200'
-if preview and url.endswith('/_health'): code = '204'
-if not preview and 'themesphone' in url: code = '503'
+if url.endswith('/_health'): code = '204'
+if not preview and 'themesphone' in url and not public_mode: code = '503'
+if public_mode and any(url.endswith(p) for p in ['/api/download', '/api/users', '/api/orders']): code = '410'
+if scenario == 'promotion_after_stop_failure' and public_mode and (base / 'preview-stopped').exists(): code = '500'
+if public_mode and new and scenario == 'unsafe_api' and url.endswith('/api/download'): code = '200'
 if scenario == 'preflight_failure': sys.exit(7)
 if new and scenario == 'http_failure': sys.exit(22)
 if new and scenario == 'public_exposure' and not preview and 'themesphone' in url: code = '200'
+with (base / 'curl-calls').open('a') as f: f.write(' '.join(sys.argv[1:]) + '\n')
 print(code, end='')
 '''
 
@@ -186,6 +200,32 @@ class DeploymentTests(unittest.TestCase):
         self.assertEqual(self.ups(), [NEW, OLD])
         self.assertIn('ROLLBACK FAILED', result.stderr)
 
+    def test_public_mode_does_not_depend_on_preview_listener(self):
+        (self.deployment / 'access-mode').write_text('public\n')
+        result = self.run_script()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.ups(), [NEW])
+        self.assertNotIn('9443', (self.base / 'curl-calls').read_text())
+
+    def test_public_mode_rejects_unsafe_images_before_stop(self):
+        (self.deployment / 'access-mode').write_text('public\n')
+        result = self.run_script('unsafe_image')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(self.ups(), [])
+        self.assertFalse((self.base / 'stopped').exists())
+
+    def test_public_mode_checks_disabled_endpoints(self):
+        (self.deployment / 'access-mode').write_text('public\n')
+        result = self.run_script('unsafe_api')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(self.ups(), [NEW, OLD])
+
+    def test_invalid_access_mode_is_rejected(self):
+        (self.deployment / 'access-mode').write_text('invalid\n')
+        result = self.run_script()
+        self.assertEqual(result.returncode, 65)
+        self.assertEqual(self.ups(), [])
+
     def test_concurrent_deployment_is_rejected(self):
         with (self.base / 'lock').open('w') as f:
             fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -221,6 +261,78 @@ class DeploymentTests(unittest.TestCase):
         self.assertEqual(self.ups(), [])
         self.assertEqual((self.deployment / '.env').read_text(), self.original)
         self.assertEqual(len(list(self.deployment.glob('before-actions-*'))), 2)
+
+class PublicationTests(unittest.TestCase):
+    setUp = DeploymentTests.setUp
+    rewrite = DeploymentTests.rewrite
+
+    def prepare_publisher(self):
+        edge = self.base / 'edge'
+        edge.mkdir()
+        self.original_caddy = (
+            'geoconverter.ru { respond "existing geoconverter" }\n'
+            'profitsite.ru { respond "existing profitsite" }\n'
+            'themesphone.ru, www.themesphone.ru, themesphone.com, www.themesphone.com, cms.themesphone.ru {\n'
+            '    respond "ThemesPhone: сайт восстанавливается." 503\n}\n'
+        )
+        (edge / 'Caddyfile').write_text(self.original_caddy)
+        preview = self.base / 'preview'
+        preview.mkdir()
+        (preview / 'compose.yaml').write_text('name: themesphone-preview\n')
+        installed = self.base / 'installed-deploy'
+        installed.write_text(self.script.read_text())
+        installed.chmod(0o755)
+        source = self.base / 'publisher'
+        source.mkdir()
+        (source / 'themesphone-public.caddy').write_text((SOURCE / 'themesphone-public.caddy').read_text())
+        text = (SOURCE / 'publish-public.sh').read_text()
+        text = text.replace('/opt/hosting/themesphone-preview/compose.yaml', str(preview / 'compose.yaml'))
+        text = self.rewrite(text)
+        text = text.replace('/opt/hosting/edge/conf', str(edge))
+        text = text.replace('/opt/hosting/backups', str(self.base / 'backups'))
+        text = text.replace('/usr/local/sbin/deploy-themesphone', str(installed))
+        self.publisher = source / 'publish-public.sh'
+        self.publisher.write_text(text)
+        self.edge = edge
+
+    def publish(self, scenario='promotion_success'):
+        return subprocess.run(['bash', str(self.publisher)], env=dict(self.env, SCENARIO=scenario),
+                              text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=20)
+
+    def test_publication_preserves_neighbours_and_removes_preview(self):
+        self.prepare_publisher()
+        result = self.publish()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual((self.deployment / 'access-mode').read_text(), 'public\n')
+        text = (self.edge / 'Caddyfile').read_text()
+        self.assertIn('existing geoconverter', text)
+        self.assertIn('existing profitsite', text)
+        self.assertIn('reverse_proxy themesphone-frontend:3000', text)
+        self.assertNotIn('сайт восстанавливается', text)
+        self.assertTrue((self.base / 'preview-stopped').exists())
+
+    def test_validation_failure_does_not_change_live_config(self):
+        self.prepare_publisher()
+        result = self.publish('promotion_validate_failure')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual((self.edge / 'Caddyfile').read_text(), self.original_caddy)
+        self.assertFalse((self.deployment / 'access-mode').exists())
+        self.assertFalse((self.base / 'preview-stopped').exists())
+
+    def test_reload_failure_restores_placeholder(self):
+        self.prepare_publisher()
+        result = self.publish('promotion_reload_failure')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual((self.edge / 'Caddyfile').read_text(), self.original_caddy)
+        self.assertFalse((self.deployment / 'access-mode').exists())
+
+    def test_failure_after_preview_shutdown_restores_private_access(self):
+        self.prepare_publisher()
+        result = self.publish('promotion_after_stop_failure')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual((self.edge / 'Caddyfile').read_text(), self.original_caddy)
+        self.assertFalse((self.deployment / 'access-mode').exists())
+        self.assertTrue((self.base / 'preview-restarted').exists())
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)
