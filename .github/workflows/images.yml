@@ -4,6 +4,11 @@ on:
   push:
     branches: [main, infra/docker-local, infra/ghcr-hosting]
   workflow_dispatch:
+    inputs:
+      deploy:
+        description: Deploy main after all checks pass
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -14,7 +19,24 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  check_deploy_scripts:
+    name: Check deployment scripts
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Check shell syntax
+        run: bash -n deploy/deploy-themesphone.sh deploy/install-actions-key.sh deploy/smoke-images.sh deploy/setup-preview.sh
+      - name: Check deployment transitions and key preservation
+        run: sudo python3 deploy/tests/test_deploy.py
+
   images:
+    needs: check_deploy_scripts
     runs-on: ubuntu-latest
     timeout-minutes: 35
     env:
@@ -78,9 +100,52 @@ jobs:
             echo "\`$BACKEND_IMAGE\`"
             echo "\`$FRONTEND_IMAGE\`"
             echo ''
-            echo 'Both images passed startup checks. No VPS deployment was performed.'
+            echo 'Both images passed startup checks. See the deploy job for deployment status; working branches never deploy.'
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Log out of GHCR
         if: always()
         run: docker logout ghcr.io
+
+  deploy:
+    name: Deploy ThemesPhone to private preview
+    needs: [check_deploy_scripts, images]
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'push' ||
+       (github.event_name == 'workflow_dispatch' && inputs.deploy))
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    concurrency:
+      group: themesphone-production
+      cancel-in-progress: false
+    env:
+      DEPLOY_HOST: ${{ secrets.THEMESPHONE_VPS_HOST }}
+      DEPLOY_KEY: ${{ secrets.THEMESPHONE_VPS_SSH_KEY }}
+      DEPLOY_KNOWN_HOSTS: ${{ secrets.THEMESPHONE_VPS_KNOWN_HOSTS }}
+    steps:
+      - name: Check restricted SSH access and deploy checked images
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$DEPLOY_HOST"
+          test -n "$DEPLOY_KEY"
+          test -n "$DEPLOY_KNOWN_HOSTS"
+          [[ "$DEPLOY_HOST" =~ ^[a-zA-Z0-9.-]+$ ]]
+          task_ssh_dir=$(mktemp -d)
+          trap 'rm -rf -- "$task_ssh_dir"' EXIT
+          printf '%s\n' "$DEPLOY_KEY" > "$task_ssh_dir/key"
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > "$task_ssh_dir/known_hosts"
+          chmod 600 "$task_ssh_dir/key" "$task_ssh_dir/known_hosts"
+          task_ssh() {
+            ssh -i "$task_ssh_dir/key" \
+              -o IdentitiesOnly=yes -o BatchMode=yes \
+              -o StrictHostKeyChecking=yes \
+              -o UserKnownHostsFile="$task_ssh_dir/known_hosts" \
+              -o ConnectTimeout=15 -o ServerAliveInterval=30 \
+              -o ServerAliveCountMax=6 "root@$DEPLOY_HOST" "$@"
+          }
+          task_ssh check
+          task_ssh "deploy $GITHUB_SHA"

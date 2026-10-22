@@ -42,3 +42,6 @@ restore-tested locally. Future deployment automation and rollback checks are sti
 
 Public exposure is a separate step. Authorization, mock payment and download handling
 are incomplete; no Caddy public routing or SSH Actions key is installed by this file.
+
+Deployment automation is described in CICD.md. Installed server scripts must be updated
+explicitly; pushing application code changes only the selected image SHA.
