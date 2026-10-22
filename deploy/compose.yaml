@@ -1,0 +1,107 @@
+name: themesphone
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  themesphone-db:
+    image: postgres:17.2-bookworm
+    restart: unless-stopped
+    mem_limit: 256m
+    environment:
+      POSTGRES_USER: ${DATABASE_USERNAME:?Set DATABASE_USERNAME in .env}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:?Set DATABASE_PASSWORD in .env}
+      POSTGRES_DB: ${DATABASE_NAME:?Set DATABASE_NAME in .env}
+    command: ["postgres", "-c", "shared_buffers=64MB", "-c", "work_mem=4MB", "-c", "max_connections=30"]
+    volumes:
+      - type: bind
+        source: /opt/hosting-data/themesphone/postgres
+        target: /var/lib/postgresql/data
+        bind:
+          create_host_path: false
+    healthcheck:
+      test: ["CMD-SHELL", 'pg_isready -h 127.0.0.1 -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"']
+      interval: 5s
+      timeout: 5s
+      start_period: 30s
+      retries: 20
+    logging: *logging
+    networks:
+      - database
+
+  themesphone-backend:
+    image: ghcr.io/seredapavel/themesphone/backend:${IMAGE_TAG:?Set IMAGE_TAG in .env}
+    restart: unless-stopped
+    mem_limit: 640m
+    env_file:
+      - ./.env
+    environment:
+      NODE_ENV: production
+      NODE_OPTIONS: --max-old-space-size=384
+      HOST: 0.0.0.0
+      PORT: "1337"
+      DATABASE_CLIENT: postgres
+      DATABASE_HOST: themesphone-db
+      DATABASE_PORT: "5432"
+      DATABASE_SSL: "false"
+      DATABASE_POOL_MIN: "0"
+      DATABASE_POOL_MAX: "5"
+      STRAPI_ADMIN_BACKEND_URL: https://cms.themesphone.ru
+      PUBLIC_URL: https://cms.themesphone.ru
+      STRAPI_TELEMETRY_DISABLED: "true"
+    volumes:
+      - type: bind
+        source: /opt/hosting-data/themesphone/uploads
+        target: /app/public/uploads
+        bind:
+          create_host_path: false
+    depends_on:
+      themesphone-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:1337/_health', {signal: AbortSignal.timeout(3000)}).then(r=>process.exit(r.status===204?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      start_period: 90s
+      retries: 10
+    logging: *logging
+    networks:
+      - database
+      - edge
+
+  themesphone-frontend:
+    image: ghcr.io/seredapavel/themesphone/frontend:${IMAGE_TAG:?Set IMAGE_TAG in .env}
+    restart: unless-stopped
+    mem_limit: 256m
+    env_file:
+      - ./frontend.env
+    environment:
+      NODE_ENV: production
+      NODE_OPTIONS: --max-old-space-size=192
+      HOSTNAME: 0.0.0.0
+      PORT: "3000"
+      STRAPI_API_URL: http://themesphone-backend:1337
+      NEXT_PUBLIC_STRAPI_URL: https://cms.themesphone.ru
+      FRONTEND_URL: https://themesphone.ru
+    depends_on:
+      themesphone-backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/', {signal: AbortSignal.timeout(5000)}).then(r=>process.exit(r.status===200?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 7s
+      start_period: 45s
+      retries: 6
+    logging: *logging
+    networks:
+      - edge
+
+networks:
+  database:
+    internal: true
+  edge:
+    external: true
+    name: hosting_themesphone_edge
