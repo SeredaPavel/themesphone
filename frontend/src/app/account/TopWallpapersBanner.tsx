@@ -7,6 +7,7 @@ import WallpaperCard from '@/components/WallpaperCard'
 
 type Wallpaper = {
   id: number
+  documentId?: string
   title: string
   imageUrl: string
   isFree: boolean
@@ -51,6 +52,7 @@ export default function TopWallpapersBanner() {
 
               return {
                 id: item.id,
+                documentId: item.documentId,
                 title: item.title,
                 imageUrl,
                 isFree: item.isFree,
@@ -127,6 +129,7 @@ export default function TopWallpapersBanner() {
             <div key={wp.id} className="shrink-0 w-[130px]">
               <WallpaperCard
                 id={wp.id}
+                documentId={wp.documentId}
                 title={wp.title}
                 imageUrl={wp.imageUrl}
                 isFree={wp.isFree}

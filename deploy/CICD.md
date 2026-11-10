@@ -2,10 +2,12 @@
 
 Workflow: `.github/workflows/images.yml`.
 
-- Working branches `infra/docker-local`, `infra/ghcr-hosting` and `infra/public-access`: validate scripts, build,
+- Working branches `dev` and `devcodex`: check frontend types and catalogue tests, validate scripts, build,
   check startup, publish SHA-tagged images; no deployment.
 - Push to main: the same checks and publication, then restricted SSH deployment.
 - Manual main run: deploy only if the `deploy` input is enabled.
+- Pull requests targeting `main`, `dev` or `devcodex`: run the same checks and image startup tests,
+  without GHCR login, image publication or deployment.
 - Deployment uses the installed server script, never an unrestricted root shell or uploaded code.
 
 Images: `ghcr.io/seredapavel/themesphone/{backend,frontend}:<full SHA>`.

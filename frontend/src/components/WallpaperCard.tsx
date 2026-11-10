@@ -10,6 +10,7 @@ import AuthModal from './AuthModal';
 
 type Props = {
   id: number;
+  documentId?: string;
   title: string;
   imageUrl: string;
   isFree: boolean | null;
@@ -21,6 +22,7 @@ type Props = {
 
 export default function WallpaperCard({
   id,
+  documentId,
   title,
   imageUrl,
   isFree,
@@ -29,6 +31,7 @@ export default function WallpaperCard({
   category,
   compact = false,
 }: Props) {
+  const detailUrl = `/wallpaper/${encodeURIComponent(documentId || String(id))}`;
   const downloadUrl = `/api/download?url=${encodeURIComponent(imageUrl)}&name=${encodeURIComponent(title)}.jpg`;
   const { addToCart } = useCart();
   const { user } = useAuthContext();
@@ -90,7 +93,7 @@ export default function WallpaperCard({
           compact ? 'shadow-sm w-[120px]' : 'shadow-md'
         } rounded-2xl overflow-hidden`}
       >
-        <Link href={`/wallpaper/${id}`}>
+        <Link href={detailUrl}>
           <div className={`${compact ? 'aspect-[9/16] h-[180px]' : 'aspect-[9/16]'} overflow-hidden cursor-pointer`}>
             <img
               src={imageUrl}
@@ -102,7 +105,7 @@ export default function WallpaperCard({
 
         <div className={`flex flex-col gap-2 ${compact ? 'px-2 py-3' : 'p-4'} flex-1`}>
           <h2 className={`${compact ? 'text-sm' : 'text-lg'} font-semibold break-words whitespace-normal leading-snug`}>
-            <Link href={`/wallpaper/${id}`}>{title}</Link>
+            <Link href={detailUrl}>{title}</Link>
           </h2>
 
           {!compact && (

@@ -1,36 +1,70 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ThemesPhone frontend
 
-## Getting Started
+Next.js 15.5.28, TypeScript и Node.js 22. Версии зависимостей закреплены в package-lock.json.
 
-First, run the development server:
+## Ветки и проверки
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+- `devcodex` — текущая разработка.
+- `dev` — проверка подготовленных изменений.
+- `main` — production: push запускает сборку и развёртывание на VPS.
+
+Слияния, коммиты и отправка изменений выполняются после подтверждения владельца.
+GitHub Actions проверяет все три ветки и PR: TypeScript, тесты контракта каталога,
+сборку Docker-образов, запуск с временной БД и скрипты развёртывания.
+PR не публикует образы и не выполняет deploy. Публикация кода приложения
+не переносит настройки из локальной админки Strapi в production.
+
+## Windows — Local Terminal Termius, PowerShell
+
+Требуется Node.js 22 с npm. Из корня проекта:
+
+```powershell
+Set-Location C:\Users\filkm\Projects\wallpaper_shop\frontend
+npm ci --no-audit --no-fund
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+После успешной установки:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```powershell
+npm test
+npm run typecheck
+npm run build
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Сборку и проверку типов запускайте после остановки dev-сервера: Next.js
+пересоздаёт `.next/types`, и одновременные процессы могут мешать проверке.
 
-## Learn More
+Для разработки с уже настроенным локальным Strapi:
 
-To learn more about Next.js, take a look at the following resources:
+```powershell
+npm run dev -- --hostname 127.0.0.1
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Для проверки готовой сборки:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```powershell
+npm run start -- --hostname 127.0.0.1
+```
 
-## Deploy on Vercel
+Сайт доступен на http://127.0.0.1:3000. Остановка — Ctrl+C.
+Файл `.env` должен содержать адреса вашего окружения; секреты не выводите в терминал и не добавляйте в Git.
+`STRAPI_API_URL` — адрес CMS для сервера, `NEXT_PUBLIC_STRAPI_URL` — публичный адрес CMS и изображений.
+Публичный адрес включается в сборку; после его изменения нужна новая сборка.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Карточка товара
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Новые ссылки используют Strapi `documentId`. Прежние числовые ссылки
+ищут опубликованную запись по `id` и перенаправляют на адрес с `documentId`.
+Карточка получает данные на сервере без API-токена, явно запрашивая image,
+categories и device. Описание Strapi Blocks выводится как безопасный текст.
+Отсутствующий товар, сбой CMS и отсутствие изображения имеют отдельные состояния.
+
+Покупка и скачивание на карточке пока обозначены как недоступные.
+Остальные незавершённые сценарии остаются отдельными этапами разработки.
+
+## Docker и VPS
+
+Локальное окружение и сохранение данных: `../docker/LOCAL.md`.
+Production: `../VPS_DEPLOYMENT_THEMESPHONE.md`, `../deploy/CICD.md` и `../deploy/PUBLIC.md`.
+Команды Windows выше не являются командами для VPS. Перед изменением Strapi,
+Compose или общего Caddy сначала прочитайте инфраструктурные инструкции.

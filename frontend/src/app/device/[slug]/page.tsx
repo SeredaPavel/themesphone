@@ -31,6 +31,7 @@ export default async function DevicePage({ params, searchParams }: Props) {
               <WallpaperCard
                 key={wallpaper.id}
                 id={wallpaper.id}
+                documentId={wallpaper.documentId}
                 title={wallpaper.title}
                 imageUrl={`${process.env.NEXT_PUBLIC_STRAPI_URL}${imageUrl}`}
                 isFree={wallpaper.isFree}

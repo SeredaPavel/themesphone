@@ -2,7 +2,9 @@ name: Build and publish ThemesPhone images
 
 on:
   push:
-    branches: [main, infra/docker-local, infra/ghcr-hosting, infra/public-access]
+    branches: [main, dev, devcodex]
+  pull_request:
+    branches: [main, dev, devcodex]
   workflow_dispatch:
     inputs:
       deploy:
@@ -19,6 +21,30 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  check_frontend:
+    name: Check frontend types and catalogue contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - run: npm run typecheck
+      - run: npm test
+
   check_deploy_scripts:
     name: Check deployment scripts
     runs-on: ubuntu-latest
@@ -31,7 +57,10 @@ jobs:
         with:
           persist-credentials: false
       - name: Check shell syntax
-        run: bash -n deploy/deploy-themesphone.sh deploy/install-actions-key.sh deploy/smoke-images.sh deploy/setup-preview.sh deploy/publish-public.sh
+        run: |
+          for script in deploy/*.sh; do
+            bash -n "$script"
+          done
       - name: Check public Caddy routing without application secrets
         shell: bash
         run: |
@@ -43,7 +72,7 @@ jobs:
         run: sudo python3 deploy/tests/test_deploy.py
 
   images:
-    needs: check_deploy_scripts
+    needs: [check_deploy_scripts, check_frontend]
     runs-on: ubuntu-latest
     timeout-minutes: 35
     env:
@@ -89,6 +118,7 @@ jobs:
         run: bash deploy/smoke-images.sh "$BACKEND_IMAGE" "$FRONTEND_IMAGE"
 
       - name: Log in to GHCR
+        if: github.event_name != 'pull_request'
         shell: bash
         env:
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -97,6 +127,7 @@ jobs:
           printf '%s' "$GHCR_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
 
       - name: Publish checked images
+        if: github.event_name != 'pull_request'
         shell: bash
         run: |
           set -euo pipefail
@@ -111,7 +142,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Log out of GHCR
-        if: always()
+        if: always() && github.event_name != 'pull_request'
         run: docker logout ghcr.io
 
   deploy:
