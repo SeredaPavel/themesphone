@@ -2,16 +2,20 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { notFound, permanentRedirect } from 'next/navigation';
 import { getDescriptionParagraphs, getWallpaper, getWallpaperImageUrl } from '@/lib/wallpaper.server';
+import { safeCatalogReturn, wallpaperDetailHref } from '@/lib/catalog-query';
+import CatalogBackLink from '@/components/CatalogBackLink';
 
 export const dynamic = 'force-dynamic';
 
-export default async function WallpaperDetailPage({ params }: {
+export default async function WallpaperDetailPage({ params, searchParams }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ from?: string | string[] }>;
 }) {
   const { id } = await params;
+  const returnTo = safeCatalogReturn((await searchParams).from);
   const wallpaper = await getWallpaper(id);
   if (!wallpaper) notFound();
-  if (/^\d+$/.test(id)) permanentRedirect(`/wallpaper/${wallpaper.documentId}`);
+  if (/^\d+$/.test(id)) permanentRedirect(wallpaperDetailHref(wallpaper.documentId, returnTo));
 
   const images = (wallpaper.image || []).flatMap(image => {
     if (image.mime && !image.mime.startsWith('image/')) return [];
@@ -22,7 +26,7 @@ export default async function WallpaperDetailPage({ params }: {
 
   return (
     <article className="p-6 max-w-4xl mx-auto">
-      <Link href="/" className="inline-block mb-6 underline">Вернуться в каталог</Link>
+      <CatalogBackLink href={returnTo || '/'} restoreScroll={!!returnTo} className="inline-block mb-6 underline">Вернуться к обоям</CatalogBackLink>
       <h1 className="text-3xl font-bold mb-6 break-words">{wallpaper.title}</h1>
       {images.length > 0 ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">

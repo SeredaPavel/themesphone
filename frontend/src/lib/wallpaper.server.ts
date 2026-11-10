@@ -10,6 +10,7 @@ export type WallpaperImage = {
   width?: number | null;
   height?: number | null;
   mime?: string;
+  formats?: { medium?: { url: string }; small?: { url: string } };
 };
 
 export type Wallpaper = {

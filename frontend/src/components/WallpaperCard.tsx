@@ -7,10 +7,13 @@ import { useAuthContext } from '@/context/AuthContext';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import AuthModal from './AuthModal';
+import { wallpaperDetailHref } from '@/lib/catalog-query';
+import { rememberCatalogScroll } from '@/lib/catalog-scroll';
 
 type Props = {
   id: number;
   documentId?: string;
+  returnTo?: string;
   title: string;
   imageUrl: string;
   isFree: boolean | null;
@@ -23,6 +26,7 @@ type Props = {
 export default function WallpaperCard({
   id,
   documentId,
+  returnTo,
   title,
   imageUrl,
   isFree,
@@ -31,7 +35,8 @@ export default function WallpaperCard({
   category,
   compact = false,
 }: Props) {
-  const detailUrl = `/wallpaper/${encodeURIComponent(documentId || String(id))}`;
+  const detailUrl = wallpaperDetailHref(documentId || String(id), returnTo);
+  const rememberPosition = () => { if (returnTo) rememberCatalogScroll(returnTo); };
   const downloadUrl = `/api/download?url=${encodeURIComponent(imageUrl)}&name=${encodeURIComponent(title)}.jpg`;
   const { addToCart } = useCart();
   const { user } = useAuthContext();
@@ -93,19 +98,19 @@ export default function WallpaperCard({
           compact ? 'shadow-sm w-[120px]' : 'shadow-md'
         } rounded-2xl overflow-hidden`}
       >
-        <Link href={detailUrl}>
+        <Link href={detailUrl} onClick={rememberPosition}>
           <div className={`${compact ? 'aspect-[9/16] h-[180px]' : 'aspect-[9/16]'} overflow-hidden cursor-pointer`}>
-            <img
+            {imageUrl ? <img
               src={imageUrl}
               alt={title}
               className="w-full h-full object-cover transition-transform duration-300 hover:scale-105 rounded-2xl"
-            />
+            /> : <div className="h-full flex items-center justify-center p-3 text-center text-sm">Изображение пока не добавлено</div>}
           </div>
         </Link>
 
         <div className={`flex flex-col gap-2 ${compact ? 'px-2 py-3' : 'p-4'} flex-1`}>
           <h2 className={`${compact ? 'text-sm' : 'text-lg'} font-semibold break-words whitespace-normal leading-snug`}>
-            <Link href={detailUrl}>{title}</Link>
+            <Link href={detailUrl} onClick={rememberPosition}>{title}</Link>
           </h2>
 
           {!compact && (
