@@ -28,6 +28,8 @@ export default function Header() {
   const [authOpen, setAuthOpen] = useState(false);
   const leaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const header = useRef<HTMLElement>(null);
+  const filterDropdown = useRef<HTMLDivElement>(null);
+  const filterTrigger = useRef<HTMLButtonElement>(null);
   const { cartItems } = useCart();
   const { user, setUser, loading } = useAuthContext();
   const router = useRouter();
@@ -57,18 +59,22 @@ export default function Header() {
   }, [locationKey]);
 
   useEffect(() => {
-    const close = (event: PointerEvent) => { if (!header.current?.contains(event.target as Node)) setMenu(null); };
+    const close = (event: PointerEvent) => {
+      if (!header.current?.contains(event.target as Node)) setMenu(null);
+      if (!filterDropdown.current?.contains(event.target as Node)) setFilterOpen(false);
+    };
     document.addEventListener('pointerdown', close);
     return () => { document.removeEventListener('pointerdown', close); if (leaveTimer.current) clearTimeout(leaveTimer.current); };
   }, []);
 
   function openMenu(next: 'categories' | 'profile') {
     if (leaveTimer.current) clearTimeout(leaveTimer.current);
+    setFilterOpen(false);
     setMenu(next);
   }
   function leaveMenu() { leaveTimer.current = setTimeout(() => setMenu(null), 250); }
-  function openFilter() { setMenu(null); setFilterOpen(true); }
-  function openCart() { if (!user) setAuthOpen(true); else router.push('/cart'); }
+  function toggleFilter() { setMenu(null); setFilterOpen(value => !value); }
+  function openCart() { setFilterOpen(false); if (!user) setAuthOpen(true); else router.push('/cart'); }
   async function logout() {
     await fetch('/api/auth/logout', { method: 'POST' });
     localStorage.removeItem('token');
@@ -76,7 +82,14 @@ export default function Header() {
     setUser(null); setMenu(null); router.refresh();
   }
 
-  return <header ref={header} onKeyDown={event => { if (event.key === 'Escape') setMenu(null); }}
+  function renderFilter(closeMobile?: () => void) {
+    return <CatalogFilterPanel key={locationKey} initial={filters} categories={categories} devices={devices}
+      loading={loadingOptions} error={optionsError} onReload={() => setRevision(value => value + 1)}
+      onApply={draft => { setFilterOpen(false); closeMobile?.(); router.push(catalogPageHref(context.pathname, draft, 1)); }}
+      onReset={() => { setFilterOpen(false); closeMobile?.(); router.push(context.pathname); }} />;
+  }
+
+  return <header ref={header} onKeyDown={event => { if (event.key === 'Escape') { setMenu(null); if (filterOpen) { setFilterOpen(false); filterTrigger.current?.focus(); } } }}
     className="w-full py-4 px-6 bg-[var(--background)] text-[var(--foreground)] shadow-md flex justify-between items-center z-[60] relative">
     <div className="text-2xl font-bold"><Link href="/">ThemesPhone</Link></div>
     <nav aria-label="Главное меню" className="hidden md:flex gap-3 text-sm relative items-center">
@@ -91,7 +104,12 @@ export default function Header() {
           {optionsError && <button className="px-4 py-2 underline" onClick={() => setRevision(value => value + 1)}>Повторить загрузку</button>}
         </div>}
       </div>
-      <button className={buttonClass} onClick={openFilter} aria-haspopup="dialog">Фильтр</button>
+      <div ref={filterDropdown} className="relative">
+        <button ref={filterTrigger} className={buttonClass} onClick={toggleFilter} aria-expanded={filterOpen} aria-controls="desktop-catalog-filter">Фильтр</button>
+        {filterOpen && <div id="desktop-catalog-filter" className="absolute right-0 top-full mt-2 w-72 max-w-[calc(100vw-48px)] max-h-[calc(100dvh-100px)] overflow-y-auto rounded-xl bg-[var(--background)] shadow-lg p-3">
+          {renderFilter()}
+        </div>}
+      </div>
       <button onClick={openCart} className={`${buttonClass} relative flex items-center gap-2`}>
         <ShoppingCart size={18} /><span>Корзина</span>
         {hydrated && cartItems.length > 0 && <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full w-5 h-5 items-center justify-center flex">{cartItems.length}</span>}
@@ -102,15 +120,11 @@ export default function Header() {
           <Link href="/account" onClick={() => setMenu(null)} className="px-4 py-2">Профиль</Link>
           <button onClick={logout} className="px-4 py-2 text-left">Выйти</button>
         </div>}
-      </div> : <button onClick={() => setAuthOpen(true)} className={buttonClass}>Войти</button>)}
+      </div> : <button onClick={() => { setFilterOpen(false); setAuthOpen(true); }} className={buttonClass}>Войти</button>)}
     </nav>
     <BurgerMenu categories={categories} locationKey={locationKey} backHref={backHref} restoreBackScroll={product && !!savedReturnTo}
       cartCount={hydrated ? cartItems.length : 0} user={user} authReady={hydrated && !loading} loadingCategories={loadingOptions}
-      onFilter={openFilter} onCart={openCart} onLogin={() => setAuthOpen(true)} onLogout={logout} />
-    {filterOpen && <CatalogFilterPanel key={locationKey} initial={filters} categories={categories} devices={devices}
-      loading={loadingOptions} error={optionsError} onReload={() => setRevision(value => value + 1)} onClose={() => setFilterOpen(false)}
-      onApply={draft => { setFilterOpen(false); router.push(catalogPageHref(context.pathname, draft, 1)); }}
-      onReset={() => { setFilterOpen(false); router.push(context.pathname); }} />}
+      renderFilter={renderFilter} onCart={openCart} onLogin={() => setAuthOpen(true)} onLogout={logout} />
     <AuthModal isOpen={authOpen} onClose={() => setAuthOpen(false)} />
   </header>;
 }

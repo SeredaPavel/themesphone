@@ -3,7 +3,6 @@ import Link from 'next/link';
 import { notFound, permanentRedirect } from 'next/navigation';
 import { getDescriptionParagraphs, getWallpaper, getWallpaperImageUrl } from '@/lib/wallpaper.server';
 import { safeCatalogReturn, wallpaperDetailHref } from '@/lib/catalog-query';
-import CatalogBackLink from '@/components/CatalogBackLink';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,7 +25,6 @@ export default async function WallpaperDetailPage({ params, searchParams }: {
 
   return (
     <article className="p-6 max-w-4xl mx-auto">
-      <CatalogBackLink href={returnTo || '/'} restoreScroll={!!returnTo} className="inline-block mb-6 underline">Вернуться к обоям</CatalogBackLink>
       <h1 className="text-3xl font-bold mb-6 break-words">{wallpaper.title}</h1>
       {images.length > 0 ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
