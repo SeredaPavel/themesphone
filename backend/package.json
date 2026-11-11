@@ -28,6 +28,7 @@
     "react-router-dom": "^6.0.0",
     "styled-components": "^6.0.0",
     "swagger-ui-express": "^5.0.1",
+    "undici": "6.29.1",
     "yamljs": "^0.3.0"
   },
   "engines": {

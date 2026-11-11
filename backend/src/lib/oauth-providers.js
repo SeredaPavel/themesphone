@@ -1,5 +1,6 @@
 'use strict';
 const crypto = require('node:crypto');
+const {telegramProxyFetch} = require('./oauth-transport');
 const PROVIDERS = ['google', 'yandex', 'telegram'];
 const metadata = {
   google: {issuer:'https://accounts.google.com',authorization_endpoint:'https://accounts.google.com/o/oauth2/v2/auth',token_endpoint:'https://oauth2.googleapis.com/token',jwks_uri:'https://www.googleapis.com/oauth2/v3/certs'},
@@ -25,7 +26,8 @@ async function configuration(provider, customFetch) {
     {id_token_signed_response_alg:'RS256'},
     provider==='telegram' ? client.ClientSecretBasic(process.env[prefix+'_CLIENT_SECRET']) : client.ClientSecretPost(process.env[prefix+'_CLIENT_SECRET']));
   config.timeout = 10;
-  if(customFetch) config[client.customFetch] = customFetch;
+  const transport = customFetch || (provider==='telegram' ? telegramProxyFetch() : undefined);
+  if(transport) config[client.customFetch] = transport;
   if(provider!=='yandex') client.enableNonRepudiationChecks(config);
   return {client,config};
 }
