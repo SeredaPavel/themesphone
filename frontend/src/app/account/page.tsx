@@ -6,6 +6,7 @@ import OrdersBlock from './OrdersBlock'
 import PasswordBlock from './PasswordBlock'
 import SubscribeBlock from './SubscribeBlock'
 import TopWallpapersBanner from './TopWallpapersBanner'
+import ConnectionsBlock from './ConnectionsBlock'
 
 export default async function AccountPage() {
   const user = await withAuthServer(async (user) => user, {
@@ -18,6 +19,7 @@ export default async function AccountPage() {
       <div className="flex flex-col gap-6">
         <ProfileBlock user={user} />
         <PasswordBlock />
+        {process.env.OAUTH_ENABLED==='true' && <ConnectionsBlock />}
       </div>
 
       {/* Правая колонка */}

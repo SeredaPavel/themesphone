@@ -1,0 +1,13 @@
+{
+  "kind":"collectionType",
+  "collectionName":"oauth_flows",
+  "info":{"singularName":"oauth-flow","pluralName":"oauth-flows","displayName":"OAuth flow"},
+  "options":{"draftAndPublish":false},
+  "pluginOptions":{"content-manager":{"visible":false},"content-type-builder":{"visible":false}},
+  "attributes":{
+    "key":{"type":"string","required":true,"unique":true,"private":true},
+    "payload":{"type":"json","private":true,"required":true},
+    "expiresAt":{"type":"datetime","required":true},
+    "consumedAt":{"type":"datetime"}
+  }
+}

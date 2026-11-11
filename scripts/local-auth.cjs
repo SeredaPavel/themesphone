@@ -28,7 +28,7 @@ async function main() {
     return;
   }
   const options=process.argv.slice(3);
-  if (process.argv[2] !== 'start' || options.some(arg=>arg!=='--smtp-yandex' && !arg.startsWith('--send-test='))) throw new Error('Usage: node scripts/local-auth.cjs setup|start [--smtp-yandex] [--send-test=recipient]');
+  if (process.argv[2] !== 'start' || options.some(arg=>!['--smtp-yandex','--oauth'].includes(arg) && !arg.startsWith('--send-test='))) throw new Error('Usage: node scripts/local-auth.cjs setup|start [--smtp-yandex] [--oauth] [--send-test=recipient]');
   const recipients=options.filter(arg=>arg.startsWith('--send-test=')).map(arg=>arg.slice('--send-test='.length));
   if(recipients.length>1) throw new Error('Only one test recipient is allowed.');
   const testRecipient=recipients[0];
@@ -52,6 +52,16 @@ async function main() {
   }
   process.env.DOCUMENTATION_ENABLED = 'false';
   process.env.AUTH_CONFIGURE_EMAIL = 'false';
+  process.env.OAUTH_ENABLED = 'false';
+  if(options.includes('--oauth')) {
+    const oauth=requireBackend('dotenv').parse(fs.readFileSync(path.join(root,'.local/oauth/backend.env')));
+    for(const key of ['GOOGLE_CLIENT_ID','GOOGLE_CLIENT_SECRET','YANDEX_CLIENT_ID','YANDEX_CLIENT_SECRET','TELEGRAM_CLIENT_ID','TELEGRAM_CLIENT_SECRET','OAUTH_BRIDGE_SECRET']) {
+      if(!oauth[key]) throw Error('Missing OAuth setting: '+key);
+      process.env[key]=oauth[key];
+    }
+    process.env.OAUTH_ENABLED='true';
+    process.env.OAUTH_ALLOWED_ORIGINS='http://127.0.0.1:3100,http://localhost:3100';
+  }
   if (process.env.DATABASE_NAME !== 'themesphone_auth_dev' || process.env.DATABASE_HOST !== '127.0.0.1' || process.env.DATABASE_PORT !== '5434' || process.env.NODE_ENV !== 'development') throw new Error('Refusing to use a non-isolated database.');
   process.chdir(backendDir);
   const { createStrapi } = requireBackend('@strapi/strapi');

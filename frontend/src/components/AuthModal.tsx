@@ -2,7 +2,6 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { FcGoogle } from 'react-icons/fc'
 import {
   FaApple,
   FaEnvelope,
@@ -10,7 +9,7 @@ import {
   FaEyeSlash,
   FaWandMagicSparkles,
 } from 'react-icons/fa6'
-import { FaTelegramPlane } from 'react-icons/fa'
+import SocialButtons from './auth/SocialButtons'
 import FormField from './FormField'
 import Link from 'next/link'
 
@@ -148,23 +147,10 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClos
                 <FaEnvelope className="text-xl text-gray-500" />
                 Войти через Email
               </button>
-              <button disabled className={`${buttonStyle} ${inactiveStyle}`}>
-                <FcGoogle className="text-xl bg-white rounded-full p-0.5" />
-                Войти через Google (в разработке)
-              </button>
-              <button disabled className={`${buttonStyle} ${inactiveStyle}`}>
-                <span className="w-6 h-6 flex items-center justify-center rounded-full bg-[#fc3f1d] text-white font-bold text-xs">
-                  Y
-                </span>
-                Войти через Яндекс (в разработке)
-              </button>
+              <SocialButtons />
               <button disabled className={`${buttonStyle} ${inactiveStyle}`}>
                 <FaApple className="text-xl" />
                 Войти через Apple (в разработке)
-              </button>
-              <button disabled className={`${buttonStyle} ${inactiveStyle}`}>
-                <FaTelegramPlane className="text-xl text-[#229ED9]" />
-                Войти через Telegram (в разработке)
               </button>
             </div>
           </>

@@ -53,6 +53,7 @@ services:
       PUBLIC_URL: https://cms.themesphone.ru
       AUTH_CONFIGURE_EMAIL: "true"
       AUTH_FRONTEND_URL: https://themesphone.ru
+      OAUTH_ALLOWED_ORIGINS: https://themesphone.ru,https://www.themesphone.ru,https://themesphone.com,https://www.themesphone.com
       STRAPI_TELEMETRY_DISABLED: "true"
     volumes:
       - type: bind

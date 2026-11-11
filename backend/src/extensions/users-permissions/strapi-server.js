@@ -4,7 +4,17 @@ function extendAuth(controller) {
   const forgot = controller.forgotPassword;
   const reset = controller.resetPassword;
   const change = controller.changePassword;
-  return {...controller, forgotPassword: async ctx => {
+  const register = controller.register;
+  return {...controller, register: async ctx => {
+    const email=ctx.request.body?.email;
+    if(typeof email!=='string' || strapi.config.get('database.connection.client')!=='postgres') return register(ctx);
+    // Coordinate stock email sign-up and OAuth onboarding without changing its error semantics.
+    const result=await strapi.db.transaction(async({trx})=>{
+      await require('../../lib/oauth-service').emailLock(trx,email.trim().toLowerCase());
+      try {await register(ctx);return null;} catch(error) {return error;}
+    });
+    if(result) throw result;
+  }, forgotPassword: async ctx => {
     await forgot(ctx);
     const email = ctx.request.body?.email;
     if (typeof email !== 'string' || ctx.status >= 400) return;

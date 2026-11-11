@@ -8,7 +8,7 @@ COPY . .
 ARG STRAPI_ADMIN_BACKEND_URL=http://localhost:1338
 ENV STRAPI_ADMIN_BACKEND_URL=$STRAPI_ADMIN_BACKEND_URL
 ENV NODE_ENV=production
-RUN npm run build && npm prune --omit=dev --no-audit --no-fund
+RUN npm test && npm run build && npm prune --omit=dev --no-audit --no-fund
 
 FROM node:22-bookworm-slim AS runner
 WORKDIR /app

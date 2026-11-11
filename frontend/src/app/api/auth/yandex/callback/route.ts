@@ -1,2 +1,2 @@
-// src/app/api/auth/yandex/callback/route.ts
-export { GET } from '../../google/callback/route'
+import {oauthCallback} from "@/lib/oauth";
+export const GET=(req:Request)=>oauthCallback(req,"yandex");

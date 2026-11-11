@@ -1,0 +1,13 @@
+{
+  "kind":"collectionType",
+  "collectionName":"oauth_identities",
+  "info":{"singularName":"oauth-identity","pluralName":"oauth-identities","displayName":"OAuth identity"},
+  "options":{"draftAndPublish":false},
+  "pluginOptions":{"content-manager":{"visible":false},"content-type-builder":{"visible":false}},
+  "attributes":{
+    "key":{"type":"string","required":true,"unique":true,"private":true},
+    "provider":{"type":"enumeration","enum":["google","yandex","telegram"],"required":true},
+    "subject":{"type":"string","required":true,"maxLength":255,"private":true},
+    "user":{"type":"relation","relation":"manyToOne","target":"plugin::users-permissions.user","required":true}
+  }
+}

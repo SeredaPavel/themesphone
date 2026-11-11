@@ -65,10 +65,15 @@ with tempfile.TemporaryDirectory() as folder:
             auth_paths = ['/api/register','/api/login','/api/auth/email-confirmation','/api/auth/resend-confirmation','/api/auth/forgot-password','/api/auth/reset-password','/api/auth/change-password','/api/auth/logout']
             cases += [(front, path, 'POST', 200) for path in auth_paths]
             cases += [(front, '/api/me', 'GET', 200), (front, '/api/account/profile', 'PUT', 200)]
+            oauth_reads=['/api/auth/providers','/api/auth/oauth/pending','/api/account/connections','/api/auth/google/callback','/api/auth/yandex/callback','/api/auth/telegram/callback']
+            oauth_writes=['/api/connect/google','/api/connect/yandex','/api/connect/telegram','/api/auth/oauth/register','/api/account/connections']
+            cases += [(front,path,'GET',200) for path in oauth_reads]
+            cases += [(front,path,'POST',200) for path in oauth_writes]
+            cases += [(front,path,'POST',410) for path in oauth_reads if path!='/api/account/connections']
             cases += [(front, path, 'GET', 410) for path in auth_paths]
             cases += [(front, '/api/me', 'POST', 410), (front, '/api/account/profile', 'POST', 410)]
-            cases += [(front, path, method, 410) for path in ['/api/download?url=http://127.0.0.1', '/api/checkout/pay', '/api/auth/set-token', '/api/connect/google', '/api', '/API/download', '//api/download', '/%61pi/download', '/api%2Fdownload'] for method in ['GET', 'POST']]
-            cases += [(cms, path, method, 410) for path in ['/api/users', '/api/orders', '/api/auth/local', '/API/users', '//api/users', '/%61pi/users', '/api%2Fusers'] for method in ['GET', 'POST']]
+            cases += [(front, path, method, 410) for path in ['/api/download?url=http://127.0.0.1', '/api/checkout/pay', '/api/set-token', '/api/auth/set-token', '/api/connect/apple', '/api/oauth/bridge', '/api', '/API/download', '//api/download', '/%61pi/download', '/api%2Fdownload'] for method in ['GET', 'POST']]
+            cases += [(cms, path, method, 410) for path in ['/api/users', '/api/orders', '/api/auth/local', '/api/oauth/bridge', '/api/oauth-flows', '/api/oauth-identities', '/API/users', '//api/users', '/%61pi/users', '/api%2Fusers'] for method in ['GET', 'POST']]
             cases += [(cms, '/api/wallpapers', 'POST', 410), (front, '/api/top-wallpapers', 'POST', 410), (cms, '/documentation', 'GET', 404), (cms, '/documentation/v1', 'GET', 404)]
             for target, path, method, expected in cases:
                 actual = status(target, path, method)

@@ -28,6 +28,16 @@ themesphone.ru, www.themesphone.ru, themesphone.com, www.themesphone.com {
             path /api/account/profile
         }
         reverse_proxy @profile themesphone-frontend:3000
+        @oauth_read {
+            method GET
+            path /api/auth/providers /api/auth/oauth/pending /api/account/connections /api/auth/google/callback /api/auth/yandex/callback /api/auth/telegram/callback
+        }
+        reverse_proxy @oauth_read themesphone-frontend:3000
+        @oauth_write {
+            method POST
+            path /api/connect/google /api/connect/yandex /api/connect/telegram /api/auth/oauth/register /api/account/connections
+        }
+        reverse_proxy @oauth_write themesphone-frontend:3000
         @unfinished path /api /api/*
         header @unfinished Content-Type "application/json; charset=utf-8"
         respond @unfinished `{"error":"Функция временно недоступна: сайт в разработке."}` 410

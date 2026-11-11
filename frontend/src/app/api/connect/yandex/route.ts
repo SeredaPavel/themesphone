@@ -1,8 +1,2 @@
-// ✅ src/app/api/connect/yandex/route.ts
-import { NextResponse } from 'next/server'
-
-export async function GET() {
-  return NextResponse.redirect(
-    `${process.env.NEXT_PUBLIC_STRAPI_URL || 'http://localhost:1337'}/api/connect/yandex`
-  )
-}
+import {oauthStart} from "@/lib/oauth";
+export const POST=(req:Request)=>oauthStart(req,"yandex");

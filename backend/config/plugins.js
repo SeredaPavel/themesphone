@@ -7,14 +7,6 @@ module.exports = ({ env }) => ({
   'users-permissions': {
     config: {
       jwtSecret: env('JWT_SECRET'),
-      providers: {
-        yandex: {
-          uid: env('YANDEX_CLIENT_ID'),
-          secret: env('YANDEX_CLIENT_SECRET'),
-          callback: `${env('STRAPI_ADMIN_BACKEND_URL')}/api/connect/yandex/callback`,
-          scope: ['login:email'],
-        },
-      },
     },
   },
   email: {

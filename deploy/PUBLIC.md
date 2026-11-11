@@ -39,7 +39,9 @@
 | Сайт: `/api/checkout/start`, `/api/checkout/pay` | HTTP 410 | Серверные цены, владелец заказа, настоящий платёжный провайдер, подпись webhook и повторные уведомления |
 | Сайт: POST `/api/register`, `/api/login`, `/api/auth/email-confirmation`, `/api/auth/resend-confirmation`, `/api/auth/forgot-password`, `/api/auth/reset-password`, `/api/auth/change-password`, `/api/auth/logout` | Разрешены после установки текущего Caddyfile | Email auth через BFF, Origin-проверка, HttpOnly cookie, штатная проверка Strapi |
 | Сайт: GET `/api/me`, PUT `/api/account/profile` | Разрешены после установки текущего Caddyfile | Только собственный пользователь; белый список полей |
-| Сайт: OAuth и `/api/auth/set-token` | HTTP 410 | Проверить state, callback и безопасную серверную сессию перед включением |
+| Сайт: GET `/api/auth/providers`, `/api/auth/oauth/pending`, `/api/account/connections`, `/api/auth/{google,yandex,telegram}/callback` | Разрешены после установки текущего Caddyfile | Серверный bridge, state, PKCE, nonce для OIDC, проверка подписи и одноразового запроса |
+| Сайт: POST `/api/connect/{google,yandex,telegram}`, `/api/auth/oauth/register`, `/api/account/connections` | Разрешены после установки текущего Caddyfile | Проверка Origin; новое подключение требует собственной сессии; onboarding подтверждает email |
+| Сайт: старый `/api/set-token`, `/api/auth/set-token` и Apple OAuth | HTTP 410 | Старый приём произвольного токена отключён; Apple остаётся отдельной задачей |
 | CMS: GET/HEAD wallpapers/categories/devices и отдельных записей | Проксируются с обычными правами Strapi | Проверить публичные поля и populate; не раскрывать приватные связи |
 | CMS: остальные `/api`, включая users/orders/auth и запись в коллекции | HTTP 410 | Роли, владельцы, права, валидация; разрешать адресно |
 | CMS: `/documentation` | HTTP 404 | Открывать только при необходимости и с подходящим доступом |
@@ -48,6 +50,10 @@
 
 Это не полный аудит безопасности. Права Strapi, обновления остальных зависимостей,
 законченная авторизация, платежи и защита платных файлов остаются задачами проекта.
+
+Настройки нового OAuth и порядок установки описаны в `../backend/OAUTH_SETTINGS.md`.
+Strapi `/api/oauth/bridge` остаётся недоступным через CMS Caddy; его нельзя открывать
+ради кнопок входа. Пользовательские OAuth-таблицы не получают публичного CRUD.
 
 ## Как вернуть функцию
 
