@@ -29,6 +29,8 @@ Caddy CMS этот путь остаётся закрыт; публичные CR
 3. Google/Telegram используют code + PKCE S256 + state + nonce. ID-токены
    проверяются по JWKS: подпись RS256, issuer, audience, nonce и срок действия.
    Яндекс использует code + PKCE S256 + state, серверный `/info` и проверку client_id.
+   Google и Яндекс передают параметры клиента через client_secret_post;
+   Telegram — через client_secret_basic согласно его OIDC-контракту.
 4. Callback принимает только code flow, сопоставляет state, cookie и origin,
    однократно расходует запрос. При связывании проверяются тот же пользователь
    и та же сессия, с которой начато подключение.

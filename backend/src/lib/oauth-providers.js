@@ -23,7 +23,7 @@ async function configuration(provider, customFetch) {
   const prefix = provider.toUpperCase();
   const config = new client.Configuration(metadata[provider],process.env[prefix+'_CLIENT_ID'],
     {id_token_signed_response_alg:'RS256'},
-    provider==='yandex' ? client.ClientSecretPost(process.env[prefix+'_CLIENT_SECRET']) : client.ClientSecretBasic(process.env[prefix+'_CLIENT_SECRET']));
+    provider==='telegram' ? client.ClientSecretBasic(process.env[prefix+'_CLIENT_SECRET']) : client.ClientSecretPost(process.env[prefix+'_CLIENT_SECRET']));
   config.timeout = 10;
   if(customFetch) config[client.customFetch] = customFetch;
   if(provider!=='yandex') client.enableNonRepudiationChecks(config);

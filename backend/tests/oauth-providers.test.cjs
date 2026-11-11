@@ -23,7 +23,12 @@ function transport(provider,overrides={},key=privateKey) {
     const body=new URLSearchParams(options.body);
     assert.equal(body.get('code_verifier'),flow.verifier);
     assert.equal(body.get('redirect_uri'),flow.origin+'/api/auth/'+provider+'/callback');
-    assert.match(new Headers(options.headers).get('authorization'),/^Basic /);
+    if(provider==='telegram') assert.match(new Headers(options.headers).get('authorization'),/^Basic /);
+    else {
+      assert.equal(body.get('client_id'),'test-client');
+      assert.equal(body.get('client_secret'),'test-secret');
+      assert.equal(new Headers(options.headers).get('authorization'),null);
+    }
     const now=Math.floor(Date.now()/1000);
     return Response.json({access_token:'provider-only-secret',token_type:'Bearer',expires_in:3600,id_token:signed({iss:issuer,aud:'test-client',sub:'external-123',iat:now,exp:now+300,nonce:flow.nonce,email:'user@example.test',email_verified:true,...overrides},key)});
   };
