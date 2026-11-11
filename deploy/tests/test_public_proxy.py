@@ -24,7 +24,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header('Content-Type', 'application/json')
         self.end_headers()
         self.wfile.write(b'{"upstream":true}')
-    do_HEAD = do_POST = do_DELETE = do_GET
+    do_HEAD = do_POST = do_PUT = do_DELETE = do_GET
     def log_message(self, *args):
         pass
 
@@ -54,7 +54,7 @@ with tempfile.TemporaryDirectory() as folder:
     with (Path(folder) / 'log').open('w') as log:
         process = subprocess.Popen([binary, 'run', '--config', str(config), '--adapter', 'caddyfile'], stdout=log, stderr=log)
         try:
-            for _ in range(60):
+            for _ in range(200):
                 try:
                     if status(front, '/healthz') == 200:
                         break
@@ -62,13 +62,21 @@ with tempfile.TemporaryDirectory() as folder:
                     time.sleep(.05)
             cases = [(front, path, 'GET', 200) for path in ['/', '/cart', '/auth/login', '/checkout/1', '/_next/image', '/api/top-wallpapers']]
             cases += [(cms, path, 'GET', 200) for path in ['/admin', '/content-manager/test', '/upload/files', '/uploads/example.jpg', '/api/wallpapers', '/api/categories?populate=*', '/api/devices/test']]
-            cases += [(front, path, method, 410) for path in ['/api/download?url=http://127.0.0.1', '/api/checkout/pay', '/api/register', '/api/me', '/api', '/API/download', '//api/download', '/%61pi/download', '/api%2Fdownload'] for method in ['GET', 'POST']]
+            auth_paths = ['/api/register','/api/login','/api/auth/email-confirmation','/api/auth/resend-confirmation','/api/auth/forgot-password','/api/auth/reset-password','/api/auth/change-password','/api/auth/logout']
+            cases += [(front, path, 'POST', 200) for path in auth_paths]
+            cases += [(front, '/api/me', 'GET', 200), (front, '/api/account/profile', 'PUT', 200)]
+            cases += [(front, path, 'GET', 410) for path in auth_paths]
+            cases += [(front, '/api/me', 'POST', 410), (front, '/api/account/profile', 'POST', 410)]
+            cases += [(front, path, method, 410) for path in ['/api/download?url=http://127.0.0.1', '/api/checkout/pay', '/api/auth/set-token', '/api/connect/google', '/api', '/API/download', '//api/download', '/%61pi/download', '/api%2Fdownload'] for method in ['GET', 'POST']]
             cases += [(cms, path, method, 410) for path in ['/api/users', '/api/orders', '/api/auth/local', '/API/users', '//api/users', '/%61pi/users', '/api%2Fusers'] for method in ['GET', 'POST']]
             cases += [(cms, '/api/wallpapers', 'POST', 410), (front, '/api/top-wallpapers', 'POST', 410), (cms, '/documentation', 'GET', 404), (cms, '/documentation/v1', 'GET', 404)]
             for target, path, method, expected in cases:
                 actual = status(target, path, method)
                 assert actual == expected, (path, method, expected, actual)
             print(f'PASS: {len(cases)} real Caddy route checks; UI routes preserved, restricted APIs blocked.')
+        except Exception:
+            print((Path(folder) / 'log').read_text(), file=sys.stderr)
+            raise
         finally:
             process.terminate()
             process.wait(timeout=10)

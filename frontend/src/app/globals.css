@@ -107,6 +107,12 @@ h1:not(.sr-only) { font-size: clamp(2.7rem, 5vw, 4.6rem); }
 .field-adornment button { padding:5px; border-radius:50%; transition:background .2s; }
 .field-adornment button:hover { background:#e5efef; }
 .form-muted { color:#6d8387; }
+.form-eyebrow { color:#6d8387; font-size:10px; font-weight:500; letter-spacing:.12em; text-transform:uppercase; }
+.form-message { border:1px solid #c5dedb; background:#edf6f4; color:#226764; border-radius:14px; padding:12px 14px; font-size:14px; line-height:1.6; }
+.form-message--error { border-color:#efcfce; background:#fdf1ef; color:#973e43; }
+.outline-field input:disabled { color:#76898c; cursor:not-allowed; }
+.outline-field input:read-only { color:#6d8387; }
+.form-panel button:disabled { opacity:.5; cursor:not-allowed; }
 .account-layout { padding-top:28px; }
 .product-detail { background:#073d40d9; border:1px solid #e9ffff20; border-radius:28px; margin-top:20px; margin-bottom:28px; }
 @keyframes menu-reveal { from { opacity:0; transform:translateY(-7px); } to { opacity:1; transform:translateY(0); } }

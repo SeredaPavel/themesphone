@@ -3,9 +3,12 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useAuthContext } from '@/context/AuthContext'
+import Link from 'next/link'
 
 export default function LoginForm() {
   const router = useRouter()
+  const { setUser } = useAuthContext()
   const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -15,7 +18,7 @@ export default function LoginForm() {
     setError('')
 
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_STRAPI_URL}/api/auth/local`, {
+      const res = await fetch('/api/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ identifier, password }),
@@ -24,18 +27,13 @@ export default function LoginForm() {
       const data = await res.json()
 
       if (!res.ok) {
-        setError(data.error?.message || 'Ошибка входа')
+        setError(data.error || 'Ошибка входа')
         return
       }
 
-      // Сохраняем токен в cookie
-      await fetch('/api/auth/save-token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token: data.jwt }),
-      })
-
-      router.push('/')
+      setUser(data.user)
+      router.replace('/account')
+      router.refresh()
     } catch (err) {
       setError('Ошибка соединения')
     }
@@ -63,6 +61,7 @@ export default function LoginForm() {
         Войти
       </button>
       {error && <p className="text-red-500">{error}</p>}
+      <Link href="/auth/forgot-password" className="text-sm underline">Забыли пароль?</Link>
     </form>
   )
 }

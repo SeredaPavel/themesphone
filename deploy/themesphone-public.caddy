@@ -13,6 +13,21 @@ themesphone.ru, www.themesphone.ru, themesphone.com, www.themesphone.com {
             path /api/top-wallpapers
         }
         reverse_proxy @top themesphone-frontend:3000
+        @self {
+            method GET
+            path /api/me
+        }
+        reverse_proxy @self themesphone-frontend:3000
+        @email_auth {
+            method POST
+            path /api/register /api/login /api/auth/email-confirmation /api/auth/resend-confirmation /api/auth/forgot-password /api/auth/reset-password /api/auth/change-password /api/auth/logout
+        }
+        reverse_proxy @email_auth themesphone-frontend:3000
+        @profile {
+            method PUT
+            path /api/account/profile
+        }
+        reverse_proxy @profile themesphone-frontend:3000
         @unfinished path /api /api/*
         header @unfinished Content-Type "application/json; charset=utf-8"
         respond @unfinished `{"error":"Функция временно недоступна: сайт в разработке."}` 410

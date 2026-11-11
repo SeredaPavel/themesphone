@@ -2,7 +2,7 @@
 
 module.exports = ({ env }) => ({
   documentation: {
-    enabled: true,
+    enabled: env.bool('DOCUMENTATION_ENABLED', true),
   },
   'users-permissions': {
     config: {
@@ -24,20 +24,15 @@ module.exports = ({ env }) => ({
         host: env('SMTP_HOST'),
         port: env.int('SMTP_PORT'),
         secure: env.bool('SMTP_SECURE'),
-        auth: {
+        ...(env('SMTP_USER') ? { auth: {
           user: env('SMTP_USER'),
           pass: env('SMTP_PASS'),
-        },
+        } } : {}),
       },
-      'users-permissions': {
-    config: {
-      email: {
-        confirmation: {
-          redirectUrl: 'http://localhost:3000/confirmation/submit',
-          },
-         },
-       },
-     },
+      settings: {
+        defaultFrom: env('SMTP_FROM', 'no-reply@themesphone.ru'),
+        defaultReplyTo: env('SMTP_REPLY_TO', env('SMTP_FROM', 'no-reply@themesphone.ru')),
+      },
     },
   },
 });

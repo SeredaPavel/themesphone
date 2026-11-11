@@ -12,6 +12,7 @@ import {
 } from 'react-icons/fa6'
 import { FaTelegramPlane } from 'react-icons/fa'
 import FormField from './FormField'
+import Link from 'next/link'
 
 export default function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
   const [mode, setMode] = useState<'select' | 'email'>('select')
@@ -26,6 +27,8 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClos
   const [passwordTooShort, setPasswordTooShort] = useState(false)
 
   const [loading, setLoading] = useState(false)
+  const [message, setMessage] = useState('')
+  const [messageError, setMessageError] = useState(false)
 
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
@@ -60,6 +63,7 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClos
     setPasswordMismatch(false)
     setPasswordTooShort(false)
     setEmailError(false)
+    setMessage('')
   }
 
   const isFormValid =
@@ -70,7 +74,7 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClos
 
   const generatePassword = () => {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*'
-    const gen = Array.from({ length: 15 }, () => chars[Math.floor(Math.random() * chars.length)]).join('')
+    const gen = Array.from(crypto.getRandomValues(new Uint32Array(15)), value => chars[value % chars.length]).join('')
     setPassword(gen)
     setConfirmPassword(gen)
   }
@@ -78,6 +82,7 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClos
   const handleRegister = async () => {
     try {
       setLoading(true)
+      setMessage('')
       const res = await fetch('/api/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -86,16 +91,18 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClos
       const data = await res.json()
 
       if (!res.ok) {
-        alert(data?.error || 'Ошибка регистрации')
+        setMessageError(true)
+        setMessage(data?.error || 'Ошибка регистрации')
         return
       }
 
-      alert('Письмо для подтверждения отправлено на вашу почту. Пожалуйста подтвердите регистрацию.')
-      reset()
-      onClose()
+      setMessageError(false)
+      setMessage('Письмо для подтверждения отправлено. Откройте ссылку в письме, затем войдите в аккаунт.')
+      setPassword('')
+      setConfirmPassword('')
     } catch (err) {
-      console.error(err)
-      alert('Произошла ошибка регистрации')
+      setMessageError(true)
+      setMessage('Сервис регистрации временно недоступен')
     } finally {
       setLoading(false)
     }
@@ -141,21 +148,21 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClos
                 <FaEnvelope className="text-xl text-gray-500" />
                 Войти через Email
               </button>
-              <button onClick={() => (window.location.href = '/api/connect/google')} className={buttonStyle}>
+              <button disabled className={`${buttonStyle} ${inactiveStyle}`}>
                 <FcGoogle className="text-xl bg-white rounded-full p-0.5" />
-                Войти через Google
+                Войти через Google (в разработке)
               </button>
-              <button onClick={() => (window.location.href = '/api/connect/yandex')} className={buttonStyle}>
+              <button disabled className={`${buttonStyle} ${inactiveStyle}`}>
                 <span className="w-6 h-6 flex items-center justify-center rounded-full bg-[#fc3f1d] text-white font-bold text-xs">
                   Y
                 </span>
-                Войти через Яндекс
+                Войти через Яндекс (в разработке)
               </button>
-              <button onClick={() => alert('Авторизация через Apple в разработке')} className={`${buttonStyle} ${inactiveStyle}`}>
+              <button disabled className={`${buttonStyle} ${inactiveStyle}`}>
                 <FaApple className="text-xl" />
                 Войти через Apple (в разработке)
               </button>
-              <button onClick={() => alert('Авторизация через Telegram в разработке')} className={`${buttonStyle} ${inactiveStyle}`}>
+              <button disabled className={`${buttonStyle} ${inactiveStyle}`}>
                 <FaTelegramPlane className="text-xl text-[#229ED9]" />
                 Войти через Telegram (в разработке)
               </button>
@@ -172,13 +179,16 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClos
                } else {
                  try {
                    setLoading(true);
+                   setMessage('');
                    const { loginUser } = await import('@/lib/auth');
-                   const user = await loginUser(email, password);
-                   console.log('✅ Вход выполнен:', user);
+                   await loginUser(email, password);
                    onClose();
-                   window.location.reload();
+                   const nextUrl = new URL(window.location.href);
+                   nextUrl.searchParams.delete('auth');
+                   window.location.replace(nextUrl.pathname + nextUrl.search);
                 } catch (err: any) {
-                  alert(err.message);
+                  setMessageError(true);
+                  setMessage(err.message || 'Не удалось войти');
                 } finally {
                   setLoading(false);
                 }
@@ -251,6 +261,18 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClos
               )}
 
               <div className="flex flex-col gap-2 mt-2">
+                {message && <p role="status" className={`form-message ${messageError ? 'form-message--error' : ''}`}>{message}</p>}
+                <button type="button" className="text-sm underline self-start" disabled={loading || !email || emailError} onClick={async()=>{
+                  setLoading(true); setMessage('');
+                  try {
+                    const res=await fetch('/api/auth/resend-confirmation',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email})});
+                    const data=await res.json();
+                    setMessageError(!res.ok);
+                    setMessage(res.ok ? 'Если адрес зарегистрирован и ещё не подтверждён, мы отправили письмо. Проверьте также папку «Спам».' : data.error || 'Не удалось отправить письмо');
+                  } catch { setMessageError(true); setMessage('Сервис отправки временно недоступен'); }
+                  finally { setLoading(false); }
+                }}>Отправить подтверждение повторно</button>
+                {!isRegistering && <Link href="/auth/forgot-password" onClick={onClose} className="text-sm underline form-muted mb-2 self-start">Забыли пароль?</Link>}
                 <button
                   type="submit"
                   disabled={!isFormValid || loading}
@@ -270,6 +292,7 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClos
                     setConfirmPassword('')
                     setPasswordMismatch(false)
                     setPasswordTooShort(false)
+                    setMessage('')
                   }}
                   className="text-sm text-center text-gray-500 hover:underline"
                 >

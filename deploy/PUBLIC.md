@@ -37,7 +37,9 @@
 | Сайт: остальные `/api` и `/api/*` | HTTP 410, JSON о временной недоступности | Открывать конкретные маршруты после проверки |
 | Сайт: `/api/download` | HTTP 410 | Убрать произвольный URL; проверять источник/ID файла, размер, права и покупку; закрыть SSRF |
 | Сайт: `/api/checkout/start`, `/api/checkout/pay` | HTTP 410 | Серверные цены, владелец заказа, настоящий платёжный провайдер, подпись webhook и повторные уведомления |
-| Сайт: API входа, регистрации, OAuth, подтверждения, `/api/me` | HTTP 410; формы остаются | Проверить полный цикл, cookies, OAuth redirect/state, права; убрать логирование токенов |
+| Сайт: POST `/api/register`, `/api/login`, `/api/auth/email-confirmation`, `/api/auth/resend-confirmation`, `/api/auth/forgot-password`, `/api/auth/reset-password`, `/api/auth/change-password`, `/api/auth/logout` | Разрешены после установки текущего Caddyfile | Email auth через BFF, Origin-проверка, HttpOnly cookie, штатная проверка Strapi |
+| Сайт: GET `/api/me`, PUT `/api/account/profile` | Разрешены после установки текущего Caddyfile | Только собственный пользователь; белый список полей |
+| Сайт: OAuth и `/api/auth/set-token` | HTTP 410 | Проверить state, callback и безопасную серверную сессию перед включением |
 | CMS: GET/HEAD wallpapers/categories/devices и отдельных записей | Проксируются с обычными правами Strapi | Проверить публичные поля и populate; не раскрывать приватные связи |
 | CMS: остальные `/api`, включая users/orders/auth и запись в коллекции | HTTP 410 | Роли, владельцы, права, валидация; разрешать адресно |
 | CMS: `/documentation` | HTTP 404 | Открывать только при необходимости и с подходящим доступом |

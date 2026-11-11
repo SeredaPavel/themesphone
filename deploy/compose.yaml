@@ -51,6 +51,8 @@ services:
       DATABASE_POOL_MAX: "5"
       STRAPI_ADMIN_BACKEND_URL: https://cms.themesphone.ru
       PUBLIC_URL: https://cms.themesphone.ru
+      AUTH_CONFIGURE_EMAIL: "true"
+      AUTH_FRONTEND_URL: https://themesphone.ru
       STRAPI_TELEMETRY_DISABLED: "true"
     volumes:
       - type: bind
@@ -86,6 +88,7 @@ services:
       STRAPI_API_URL: http://themesphone-backend:1337
       NEXT_PUBLIC_STRAPI_URL: https://cms.themesphone.ru
       FRONTEND_URL: https://themesphone.ru
+      AUTH_ALLOWED_ORIGINS: https://themesphone.ru,https://www.themesphone.ru,https://themesphone.com,https://www.themesphone.com
     depends_on:
       themesphone-backend:
         condition: service_healthy

@@ -37,5 +37,7 @@ module.exports = {
   /**
    * Можно оставить пустым или добавить инициализацию при старте
    */
-  bootstrap(/*{ strapi }*/) {},
+  async bootstrap({ strapi }) {
+    await require('./lib/auth-mail').configureEmailAuth(strapi);
+  },
 };

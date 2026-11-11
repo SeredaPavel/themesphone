@@ -66,6 +66,11 @@
       "inversedBy": "users",
       "configurable": false
     },
+    "firstname": { "type": "string", "maxLength": 80 },
+    "lastname": { "type": "string", "maxLength": 80 },
+    "phone": { "type": "string", "maxLength": 32 },
+    "billingAddress": { "type": "string", "maxLength": 300 },
+    "resetPasswordExpiresAt": { "type": "datetime", "private": true },
     "orders": {
       "type": "relation",
       "relation": "oneToMany",

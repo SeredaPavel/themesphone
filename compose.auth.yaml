@@ -1,0 +1,26 @@
+name: themesphone-auth
+
+services:
+  db:
+    image: postgres:17.2-bookworm
+    environment:
+      POSTGRES_USER: ${DATABASE_USERNAME:?Run local-auth setup first}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:?Run local-auth setup first}
+      POSTGRES_DB: themesphone_auth_dev
+    ports:
+      - "127.0.0.1:5434:5432"
+    volumes:
+      - auth_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", 'pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"']
+      interval: 3s
+      timeout: 5s
+      retries: 20
+  mail:
+    image: axllent/mailpit@sha256:aef2aacc11f075ec0fb6874275ee4a421e688e11a96ebb296134d1735c7761ce
+    ports:
+      - "127.0.0.1:1026:1025"
+      - "127.0.0.1:8026:8025"
+
+volumes:
+  auth_postgres:

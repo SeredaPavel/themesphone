@@ -1,5 +1,8 @@
 # Local Docker production check
 
+For isolated email registration/session tests without restoring any existing database,
+use [AUTH_LOCAL.md](AUTH_LOCAL.md). It uses a separate Compose project, database and SMTP sink.
+
 This configuration is for Windows/local testing only. VPS/GHCR deployment is a separate step.
 
 The existing backend/.env and frontend/.env are used at runtime, excluded from image contexts and Git. No secrets are passed as build arguments. Keep their local backups.
