@@ -94,7 +94,7 @@ export default function WallpaperCard({
   return (
     <>
       <div
-        className={`bg-[var(--background)] text-[var(--foreground)] transition hover:shadow-xl flex flex-col ${
+        className={`wallpaper-card text-[var(--foreground)] transition hover:shadow-xl flex flex-col ${
           compact ? 'shadow-sm w-[120px]' : 'shadow-md'
         } rounded-2xl overflow-hidden`}
       >
@@ -117,12 +117,12 @@ export default function WallpaperCard({
             <>
               <div className="flex flex-wrap gap-2 text-xs text-[var(--foreground)]/70">
                 {category && (
-                  <span className="bg-gray-200 dark:bg-neutral-700 px-2 py-0.5 rounded-full">
+                  <span className="wallpaper-tag px-2 py-0.5 rounded-full">
                     {category.title}
                   </span>
                 )}
                 {device && (
-                  <span className="bg-gray-200 dark:bg-neutral-700 px-2 py-0.5 rounded-full">
+                  <span className="wallpaper-tag px-2 py-0.5 rounded-full">
                     {device.title}
                   </span>
                 )}
@@ -136,7 +136,7 @@ export default function WallpaperCard({
                 {isFree ? (
                   <a
                     href={downloadUrl}
-                    className="text-sm px-3 py-1 rounded-full border border-[var(--foreground)] hover:bg-[var(--foreground)] hover:text-[var(--background)] transition"
+                    className="liquid-pill !px-3 !py-1.5"
                   >
                     Загрузить
                   </a>
@@ -144,16 +144,16 @@ export default function WallpaperCard({
                   <>
                     <button
                       onClick={handleBuyNow}
-                      className="text-sm px-3 py-1 rounded-full border border-[var(--foreground)] hover:bg-[var(--foreground)] hover:text-[var(--background)] transition"
+                      className="liquid-pill !px-3 !py-1.5"
                     >
                       Купить сейчас
                     </button>
                     <button
                       onClick={handleAddToCart}
-                      className={`text-sm px-3 py-1 rounded-full border border-[var(--foreground)] transition ${
+                      className={`liquid-pill !px-3 !py-1.5 ${
                         added
-                          ? 'bg-[var(--foreground)] text-[var(--background)]'
-                          : 'hover:bg-[var(--foreground)] hover:text-[var(--background)]'
+                          ? '!bg-[#b6edf533] !text-[#b6f8fb]'
+                          : ''
                       }`}
                     >
                       {added ? '✓ Добавлено' : 'В корзину'}

@@ -19,17 +19,17 @@ export default function CatalogFilterPanel({ initial, categories, devices, loadi
     section.open = false;
     section.querySelector('summary')?.focus();
   }
-  const fieldClass = (active: boolean) => `w-full rounded-xl border px-3 py-2 ${active ? 'border-blue-500 bg-blue-500/10 text-blue-700 dark:text-blue-300' : 'border-[var(--foreground)]/40 bg-[var(--background)]'}`;
-  const choiceClass = (active: boolean) => `flex items-center gap-2 px-2 py-1.5 cursor-pointer rounded-lg ${active ? 'bg-blue-500/10 text-blue-700 dark:text-blue-300' : 'hover:bg-[var(--foreground)]/5'}`;
+  const fieldClass = (active: boolean) => `liquid-pill filter-field ${active ? 'is-selected' : ''}`;
+  const choiceClass = (active: boolean) => `filter-choice ${active ? 'is-selected' : ''}`;
   const summaryClass = (active: boolean) => `${fieldClass(active)} flex items-center justify-between gap-2 cursor-pointer list-none [&::-webkit-details-marker]:hidden`;
-  const chevron = <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="shrink-0 transition-transform group-open:rotate-180"><path d="m6 9 6 6 6-6" /></svg>;
+  const chevron = <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="shrink-0 disclosure-chevron"><path d="m6 9 6 6 6-6" /></svg>;
   const categoryTitle = categories.find(item => item.slug === draft.category)?.title;
   const deviceTitle = devices.find(item => item.slug === draft.device)?.title;
 
-  return <form onSubmit={submit} aria-label="Фильтр обоев" className="text-sm">
+  return <form onSubmit={submit} aria-label="Фильтр обоев" className="catalog-filter text-sm">
     {loading && <p role="status" className="py-2">Загрузка условий…</p>}
     {error && <div role="alert" className="py-2"><p>Не удалось загрузить условия.</p><button type="button" onClick={onReload} className="underline mt-2">Повторить</button></div>}
-    <details className="group mb-2">
+    <details className="filter-section soft-disclosure mb-2">
       <summary className={summaryClass(!!draft.category)}><span>{categoryTitle ? `Категории: ${categoryTitle}` : 'Категории'}</span>{chevron}</summary>
       <fieldset className="pt-2"><legend className="sr-only">Категория</legend>
         {[{ slug: '', title: 'Все категории' }, ...categories].map(item => <label key={item.slug} className={choiceClass(draft.category === item.slug)}>
@@ -37,7 +37,7 @@ export default function CatalogFilterPanel({ initial, categories, devices, loadi
         </label>)}
       </fieldset>
     </details>
-    <details className="group mb-2">
+    <details className="filter-section soft-disclosure mb-2">
       <summary className={summaryClass(!!draft.device)}><span>{deviceTitle ? `Устройства: ${deviceTitle}` : 'Устройства'}</span>{chevron}</summary>
       <fieldset className="pt-2"><legend className="sr-only">Устройство</legend>
         {[{ slug: '', title: 'Все устройства' }, ...devices].map(item => <label key={item.slug} className={choiceClass(draft.device === item.slug)}>
@@ -45,7 +45,7 @@ export default function CatalogFilterPanel({ initial, categories, devices, loadi
         </label>)}
       </fieldset>
     </details>
-    <details className="group mb-2">
+    <details className="filter-section soft-disclosure mb-2">
       <summary className={summaryClass(draft.sort !== 'default')}><span>{draft.sort !== 'default' ? CATALOG_SORTS[draft.sort].label : 'Сортировка'}</span>{chevron}</summary>
       <fieldset className="pt-2"><legend className="sr-only">Сортировка</legend>
         {Object.entries(CATALOG_SORTS).map(([value, option]) => <label key={value} className={choiceClass(draft.sort === value)}>
@@ -55,11 +55,11 @@ export default function CatalogFilterPanel({ initial, categories, devices, loadi
     </details>
       <label className="block"><span className="sr-only">Поиск по названию</span>
         <input type="search" maxLength={100} value={draft.q} onChange={event => setDraft({ ...draft, q: event.target.value })}
-          placeholder="Поиск по названию" className={`${fieldClass(!!draft.q.trim())} placeholder:text-[var(--foreground)] placeholder:opacity-100`} />
+          placeholder="Поиск по названию" className={`${fieldClass(!!draft.q.trim())} filter-search`} />
       </label>
     <div className="flex flex-wrap gap-2 mt-3">
-      <button type="submit" disabled={loading || error} className="rounded-full border px-2 py-1.5 bg-[var(--foreground)] text-[var(--background)] disabled:opacity-50 whitespace-nowrap">Применить</button>
-      <button type="button" onClick={onReset} className="rounded-full border px-2 py-1.5 whitespace-nowrap">Сбросить фильтр</button>
+      <button type="submit" disabled={loading || error} className="liquid-pill liquid-pill--accent !px-3 whitespace-nowrap">Применить</button>
+      <button type="button" onClick={onReset} className="liquid-pill !px-3 whitespace-nowrap">Сбросить фильтр</button>
     </div>
   </form>;
 }

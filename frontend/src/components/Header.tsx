@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { ShoppingCart, UserCircle2 } from 'lucide-react';
+import { ChevronDown, ShoppingCart, UserCircle2 } from 'lucide-react';
 import { getCategories, getDevices } from '@/lib/api';
 import type { TaxonomyItem } from '@/lib/api';
 import { catalogLocationFilters, catalogPageHref, hasCatalogFilters, isCatalogPath, safeCatalogReturn } from '@/lib/catalog-query';
@@ -14,7 +14,7 @@ import BurgerMenu from './BurgerMenu';
 import CatalogBackLink from './CatalogBackLink';
 import CatalogFilterPanel from './CatalogFilterPanel';
 
-const buttonClass = 'text-sm px-3 py-1 rounded-full border border-[var(--foreground)] hover:bg-[var(--foreground)] hover:text-[var(--background)] transition whitespace-nowrap';
+const buttonClass = 'liquid-pill whitespace-nowrap';
 
 export default function Header() {
   const [hydrated, setHydrated] = useState(false);
@@ -72,8 +72,14 @@ export default function Header() {
     setFilterOpen(false);
     setMenu(next);
   }
-  function leaveMenu() { leaveTimer.current = setTimeout(() => setMenu(null), 250); }
-  function toggleFilter() { setMenu(null); setFilterOpen(value => !value); }
+  function leaveMenu() {
+    if (leaveTimer.current) clearTimeout(leaveTimer.current);
+    leaveTimer.current = setTimeout(() => { setMenu(null); setFilterOpen(false); }, 250);
+  }
+  function openFilter() {
+    if (leaveTimer.current) clearTimeout(leaveTimer.current);
+    setMenu(null); setFilterOpen(true);
+  }
   function openCart() { setFilterOpen(false); if (!user) setAuthOpen(true); else router.push('/cart'); }
   async function logout() {
     await fetch('/api/auth/logout', { method: 'POST' });
@@ -90,23 +96,23 @@ export default function Header() {
   }
 
   return <header ref={header} onKeyDown={event => { if (event.key === 'Escape') { setMenu(null); if (filterOpen) { setFilterOpen(false); filterTrigger.current?.focus(); } } }}
-    className="w-full py-4 px-6 bg-[var(--background)] text-[var(--foreground)] shadow-md flex justify-between items-center z-[60] relative">
-    <div className="text-2xl font-bold"><Link href="/">ThemesPhone</Link></div>
+    className="site-header w-full flex justify-between items-center gap-4 z-[60] relative">
+    <div className="site-brand"><Link href="/">ThemesPhone</Link></div>
     <nav aria-label="Главное меню" className="hidden md:flex gap-3 text-sm relative items-center">
       {backHref && <CatalogBackLink href={backHref} restoreScroll={product && !!savedReturnTo} className={buttonClass} />}
       <div className="relative" onMouseEnter={() => openMenu('categories')} onMouseLeave={leaveMenu}>
-        <button className={buttonClass} aria-expanded={menu === 'categories'} onClick={() => openMenu('categories')}>Категории</button>
-        {menu === 'categories' && <div className="absolute right-0 top-full mt-2 flex flex-col bg-[var(--background)] shadow-lg rounded z-50 min-w-[180px] max-h-[75dvh] overflow-y-auto">
-          <Link href="/" onClick={() => setMenu(null)} className="px-4 py-2 hover:underline">Все обои</Link>
-          <Link href="/category" onClick={() => setMenu(null)} className="px-4 py-2 hover:underline">Все категории</Link>
-          {categories.map(category => <Link key={category.id} href={`/category/${encodeURIComponent(category.slug)}`} onClick={() => setMenu(null)} className="px-4 py-2 hover:bg-gray-100 dark:hover:bg-neutral-700 whitespace-nowrap">{category.title}</Link>)}
+        <button className={buttonClass} aria-expanded={menu === 'categories'} onClick={() => openMenu('categories')}>Категории<ChevronDown size={14} className={`transition-transform duration-300 ${menu === 'categories' ? 'rotate-180' : ''}`} /></button>
+        {menu === 'categories' && <div className="menu-stack absolute right-0 top-full mt-2 z-50 min-w-[180px] max-h-[75dvh] overflow-y-auto">
+          <Link href="/" onClick={() => setMenu(null)} className="liquid-pill">Все обои</Link>
+          <Link href="/category" onClick={() => setMenu(null)} className="liquid-pill">Все категории</Link>
+          {categories.map(category => <Link key={category.id} href={`/category/${encodeURIComponent(category.slug)}`} onClick={() => setMenu(null)} className="liquid-pill" aria-current={pathname === `/category/${category.slug}` ? 'page' : undefined}>{category.title}</Link>)}
           {loadingOptions && <p className="px-4 py-2" role="status">Загрузка…</p>}
           {optionsError && <button className="px-4 py-2 underline" onClick={() => setRevision(value => value + 1)}>Повторить загрузку</button>}
         </div>}
       </div>
-      <div ref={filterDropdown} className="relative">
-        <button ref={filterTrigger} className={buttonClass} onClick={toggleFilter} aria-expanded={filterOpen} aria-controls="desktop-catalog-filter">Фильтр</button>
-        {filterOpen && <div id="desktop-catalog-filter" className="absolute right-0 top-full mt-2 w-72 max-w-[calc(100vw-48px)] max-h-[calc(100dvh-100px)] overflow-y-auto rounded-xl bg-[var(--background)] shadow-lg p-3">
+      <div ref={filterDropdown} className="relative" onMouseEnter={openFilter} onMouseLeave={leaveMenu}>
+        <button ref={filterTrigger} className={buttonClass} onClick={openFilter} aria-expanded={filterOpen} aria-controls="desktop-catalog-filter">Фильтр<ChevronDown size={14} className={`transition-transform duration-300 ${filterOpen ? 'rotate-180' : ''}`} /></button>
+        {filterOpen && <div id="desktop-catalog-filter" className="absolute right-0 top-full mt-2 w-72 max-w-[calc(100vw-48px)] max-h-[calc(100dvh-100px)] overflow-y-auto">
           {renderFilter()}
         </div>}
       </div>
@@ -115,12 +121,12 @@ export default function Header() {
         {hydrated && cartItems.length > 0 && <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full w-5 h-5 items-center justify-center flex">{cartItems.length}</span>}
       </button>
       {hydrated && !loading && (user ? <div className="relative" onMouseEnter={() => openMenu('profile')} onMouseLeave={leaveMenu}>
-        <button aria-label="Мой профиль" onClick={() => openMenu('profile')} aria-expanded={menu === 'profile'} className="rounded-full border p-2"><UserCircle2 size={20} /></button>
-        {menu === 'profile' && <div className="absolute right-0 top-full mt-2 flex flex-col bg-[var(--background)] shadow-lg rounded min-w-max">
-          <Link href="/account" onClick={() => setMenu(null)} className="px-4 py-2">Профиль</Link>
-          <button onClick={logout} className="px-4 py-2 text-left">Выйти</button>
+        <button aria-label="Мой профиль" onClick={() => openMenu('profile')} aria-expanded={menu === 'profile'} className={buttonClass}><UserCircle2 size={20} /></button>
+        {menu === 'profile' && <div className="menu-stack absolute right-0 top-full mt-2 min-w-max">
+          <Link href="/account" onClick={() => setMenu(null)} className="liquid-pill">Профиль</Link>
+          <button onClick={logout} className="liquid-pill">Выйти</button>
         </div>}
-      </div> : <button onClick={() => { setFilterOpen(false); setAuthOpen(true); }} className={buttonClass}>Войти</button>)}
+      </div> : <button onClick={() => { setFilterOpen(false); setAuthOpen(true); }} className={`${buttonClass} liquid-pill--accent`}>Войти</button>)}
     </nav>
     <BurgerMenu categories={categories} locationKey={locationKey} backHref={backHref} restoreBackScroll={product && !!savedReturnTo}
       cartCount={hydrated ? cartItems.length : 0} user={user} authReady={hydrated && !loading} loadingCategories={loadingOptions}

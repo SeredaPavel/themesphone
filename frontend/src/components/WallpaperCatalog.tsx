@@ -27,7 +27,7 @@ export default async function WallpaperCatalog({ searchParams, category, device 
   const returnTo = catalogPageHref(pathname, filters, filters.page);
 
   return (
-    <section className="p-6 bg-[var(--background)] text-[var(--foreground)]">
+    <section className="p-6 text-[var(--foreground)]">
       <CatalogScrollRestorer href={returnTo} />
       <h1 className="sr-only">{title}</h1>
       {data.length > 0 ? (
@@ -44,17 +44,17 @@ export default async function WallpaperCatalog({ searchParams, category, device 
           })}
         </div>
       ) : (
-        <div className="rounded-xl border p-6">
+        <div className="glass-panel p-6">
           <h2 className="text-xl font-bold mb-2">Обои не найдены</h2>
           <p>Выберите другую категорию или устройство в меню.</p>
           <Link href={pathname} className="inline-block mt-3 underline">Сбросить фильтры</Link>
           {filters.page > 1 && <Link className="inline-block mt-3 underline" href={catalogPageHref(pathname, filters, 1)}>Вернуться на первую страницу</Link>}
         </div>
       )}
-      {pagination.pageCount > 1 && <nav aria-label="Страницы каталога" className="mt-8 flex flex-wrap gap-4 items-center">
-        {filters.page > 1 && <Link rel="prev" className="rounded-full border px-4 py-2" href={catalogPageHref(pathname, filters, filters.page - 1)}>Предыдущая</Link>}
+      {pagination.pageCount > 1 && <nav aria-label="Страницы каталога" className="glass-panel p-4 mt-8 flex flex-wrap gap-4 items-center">
+        {filters.page > 1 && <Link rel="prev" className="liquid-pill" href={catalogPageHref(pathname, filters, filters.page - 1)}>Предыдущая</Link>}
         <span>Страница {filters.page} из {pagination.pageCount}</span>
-        {filters.page < pagination.pageCount && <Link rel="next" className="rounded-full border px-4 py-2" href={catalogPageHref(pathname, filters, filters.page + 1)}>Следующая</Link>}
+        {filters.page < pagination.pageCount && <Link rel="next" className="liquid-pill" href={catalogPageHref(pathname, filters, filters.page + 1)}>Следующая</Link>}
       </nav>}
     </section>
   );

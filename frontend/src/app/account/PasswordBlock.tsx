@@ -1,34 +1,14 @@
-//src/app/account/PasswordBlock.tsx
-
-'use client'
-
+'use client';
+import FormField from '@/components/FormField';
 export default function PasswordBlock() {
-  return (
-    <section className="border border-[var(--foreground)] rounded-2xl p-6 flex flex-col gap-4">
-      <h2 className="text-lg font-semibold mb-2">Смена пароля</h2>
-      <input
-        type="password"
-        placeholder="Старый пароль"
-        className="px-4 py-2 rounded-full border border-[var(--foreground)] bg-transparent outline-none"
-      />
-      <input
-        type="password"
-        placeholder="Новый пароль"
-        className="px-4 py-2 rounded-full border border-[var(--foreground)] bg-transparent outline-none"
-      />
-      <input
-        type="password"
-        placeholder="Подтверждение пароля"
-        className="px-4 py-2 rounded-full border border-[var(--foreground)] bg-transparent outline-none"
-      />
-      <div className="flex gap-2 mt-2">
-        <button className="px-4 py-2 rounded-full border border-[var(--foreground)] hover:bg-[var(--foreground)] hover:text-[var(--background)] transition text-sm">
-          Редактировать
-        </button>
-        <button className="px-4 py-2 rounded-full border border-[var(--foreground)] hover:bg-[var(--foreground)] hover:text-[var(--background)] transition text-sm">
-          Сохранить
-        </button>
-      </div>
-    </section>
-  )
+  return <section className="form-panel flex flex-col gap-5">
+    <h2>Смена пароля</h2>
+    <FormField label="Старый пароль" type="password" placeholder="Текущий пароль" autoComplete="current-password" />
+    <FormField label="Новый пароль" type="password" placeholder="Новый пароль" autoComplete="new-password" />
+    <FormField label="Подтверждение пароля" type="password" placeholder="Повторите новый пароль" autoComplete="new-password" />
+    <div className="flex flex-wrap gap-2 mt-2">
+      <button className="liquid-pill">Редактировать</button>
+      <button className="liquid-pill liquid-pill--accent">Сохранить</button>
+    </div>
+  </section>;
 }

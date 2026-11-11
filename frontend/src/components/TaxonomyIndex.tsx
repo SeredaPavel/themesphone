@@ -11,7 +11,7 @@ export default async function TaxonomyIndex({ kind }: { kind: 'category' | 'devi
       <p className="mb-6">{isCategory ? 'Выберите тему для своей подборки.' : 'Выберите устройство, для которого ищете обои.'}</p>
       {items.length ? <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {items.map(item => <li key={item.id}>
-          <Link href={`/${kind}/${encodeURIComponent(item.slug)}`} className="block h-full rounded-2xl border p-5 hover:shadow-lg focus-visible:outline-2">
+          <Link href={`/${kind}/${encodeURIComponent(item.slug)}`} className="taxonomy-card">
             <h2 className="text-xl font-semibold">{item.title}</h2>
             {item.description && <p className="mt-2 text-sm">{item.description}</p>}
             <span className="inline-block mt-3 text-sm underline">Смотреть обои</span>

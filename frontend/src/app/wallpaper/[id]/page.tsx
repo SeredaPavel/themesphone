@@ -24,7 +24,7 @@ export default async function WallpaperDetailPage({ params, searchParams }: {
   const paragraphs = getDescriptionParagraphs(wallpaper.description);
 
   return (
-    <article className="p-6 max-w-4xl mx-auto">
+    <article className="product-detail p-6 max-w-4xl mx-auto">
       <h1 className="text-3xl font-bold mb-6 break-words">{wallpaper.title}</h1>
       {images.length > 0 ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">

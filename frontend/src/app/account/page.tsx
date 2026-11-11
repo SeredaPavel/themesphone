@@ -13,7 +13,7 @@ export default async function AccountPage() {
   })
 
   return (
-    <main className="p-4 sm:p-6 lg:p-8 max-w-[1440px] mx-auto w-full grid gap-6 grid-cols-1 lg:grid-cols-[1fr_2fr] text-[var(--foreground)]">
+    <div className="account-layout p-4 sm:p-6 lg:p-8 max-w-[1440px] mx-auto w-full grid gap-6 grid-cols-1 lg:grid-cols-[1fr_2fr] text-[var(--foreground)]">
       {/* Левая колонка */}
       <div className="flex flex-col gap-6">
         <ProfileBlock user={user} />
@@ -26,6 +26,6 @@ export default async function AccountPage() {
         <TopWallpapersBanner />
         <SubscribeBlock />
       </div>
-    </main>
+    </div>
   )
 }

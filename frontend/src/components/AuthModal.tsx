@@ -11,6 +11,7 @@ import {
   FaWandMagicSparkles,
 } from 'react-icons/fa6'
 import { FaTelegramPlane } from 'react-icons/fa'
+import FormField from './FormField'
 
 export default function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
   const [mode, setMode] = useState<'select' | 'email'>('select')
@@ -101,15 +102,15 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClos
   }
 
   const buttonStyle =
-    'flex items-center gap-3 px-4 py-2 rounded-full border border-[var(--foreground)] hover:bg-[var(--foreground)] hover:text-[var(--background)] transition text-sm'
+    'liquid-pill !justify-start w-full'
 
   const inactiveStyle = 'opacity-60 cursor-not-allowed'
 
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-[var(--background)] text-[var(--foreground)] rounded-2xl p-6 w-full max-w-sm shadow-xl relative">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#002b35]/50 backdrop-blur-sm p-4">
+      <div role="dialog" aria-modal="true" aria-label={mode === 'select' ? 'Вход в аккаунт' : isRegistering ? 'Регистрация' : 'Вход по Email'} className="form-panel w-full max-w-md max-h-[calc(100dvh-32px)] overflow-y-auto relative">
         <button
           onClick={() => {
             if (mode === 'email') {
@@ -120,7 +121,8 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClos
               reset()
             }
           }}
-          className="absolute top-3 right-3 text-sm hover:opacity-70"
+          aria-label={mode === 'email' ? 'Вернуться к способам входа' : 'Закрыть вход'}
+          className="absolute top-4 right-4 text-sm hover:opacity-70"
         >
           ✕
         </button>
@@ -185,30 +187,31 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClos
 
               className="flex flex-col gap-4"
             >
-              <input
+              <FormField
+                label="Email"
                 type="email"
                 placeholder="Email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="px-4 py-2 border border-[var(--foreground)] rounded-full bg-transparent outline-none"
+                autoComplete="email"
                 required
               />
               {emailError && <span className="text-sm text-red-500 -mt-3">Некорректный email</span>}
 
-              <div className="relative">
-                <input
+                <FormField
+                  label="Пароль"
                   type={showPassword ? 'text' : 'password'}
                   placeholder="Пароль"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full px-4 py-2 border border-[var(--foreground)] rounded-full bg-transparent outline-none pr-20"
+                  autoComplete={isRegistering ? 'new-password' : 'current-password'}
                   required
-                />
+                  adornment={<>
                 {isRegistering && (
                   <button
                     type="button"
                     onClick={generatePassword}
-                    className="absolute right-10 top-1/2 -translate-y-1/2 p-1 rounded-full border border-[var(--foreground)] hover:bg-[var(--foreground)] hover:text-[var(--background)] transition"
+                    aria-label="Сгенерировать пароль"
                     title="Сгенерировать пароль"
                   >
                     <FaWandMagicSparkles size={12} />
@@ -217,21 +220,23 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClos
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-full border border-[var(--foreground)] hover:bg-[var(--foreground)] hover:text-[var(--background)] transition"
+                  aria-label={showPassword ? 'Скрыть пароль' : 'Показать пароль'}
                   title={showPassword ? 'Скрыть пароль' : 'Показать пароль'}
                 >
                   {showPassword ? <FaEyeSlash size={12} /> : <FaEye size={12} />}
                 </button>
-              </div>
+                </>}
+                />
 
               {isRegistering && (
                 <>
-                  <input
+                  <FormField
+                    label="Подтверждение пароля"
                     type={showPassword ? 'text' : 'password'}
                     placeholder="Подтверждение пароля"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="px-4 py-2 border border-[var(--foreground)] rounded-full bg-transparent outline-none"
+                    autoComplete="new-password"
                     required
                   />
                   {passwordMismatch && (
@@ -249,9 +254,9 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClos
                 <button
                   type="submit"
                   disabled={!isFormValid || loading}
-                  className={`px-4 py-2 rounded-full border border-[var(--foreground)] transition text-sm ${
+                  className={`liquid-pill liquid-pill--accent ${
                     isFormValid
-                      ? 'hover:bg-[var(--foreground)] hover:text-[var(--background)]'
+                      ? ''
                       : 'opacity-50 cursor-not-allowed'
                   }`}
                 >

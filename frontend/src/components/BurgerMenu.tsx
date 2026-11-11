@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { Menu, X } from 'lucide-react';
+import { ChevronDown, Menu, X } from 'lucide-react';
 import type { TaxonomyItem } from '@/lib/api';
 import CatalogBackLink from './CatalogBackLink';
 
@@ -30,29 +30,29 @@ export default function BurgerMenu({ categories, locationKey, backHref, restoreB
   }, [open]);
   const act = (action: () => void) => { setOpen(false); action(); };
   return <div ref={container} className="md:hidden relative z-50">
-    <button ref={trigger} onClick={() => setOpen(!open)} aria-label={open ? 'Закрыть меню' : 'Открыть меню'} aria-expanded={open} aria-controls="mobile-navigation" className="p-1">
-      {open ? <X size={28} /> : <Menu size={28} />}
+    <button ref={trigger} onClick={() => setOpen(!open)} aria-label={open ? 'Закрыть меню' : 'Открыть меню'} aria-expanded={open} aria-controls="mobile-navigation" className="liquid-pill !p-3">
+      {open ? <X size={22} /> : <Menu size={22} />}
     </button>
-    {open && <nav id="mobile-navigation" aria-label="Мобильное меню" className="absolute top-full right-0 mt-2 w-64 max-h-[calc(100dvh-90px)] overflow-y-auto rounded-xl border bg-[var(--background)] shadow-lg p-4 space-y-4">
-      {backHref && <CatalogBackLink href={backHref} restoreScroll={restoreBackScroll} onNavigate={() => setOpen(false)} className="block underline" />}
-      <details>
-        <summary className="cursor-pointer font-semibold">Категории</summary>
-        <div className="flex flex-col gap-2 mt-3">
-          <Link href="/" onClick={() => setOpen(false)}>Все обои</Link>
-          <Link href="/category" onClick={() => setOpen(false)}>Все категории</Link>
-          {categories.map(category => <Link key={category.id} href={`/category/${encodeURIComponent(category.slug)}`} onClick={() => setOpen(false)}>{category.title}</Link>)}
+    {open && <nav id="mobile-navigation" aria-label="Мобильное меню" className="glass-panel absolute top-full right-0 mt-3 w-72 max-w-[calc(100vw-40px)] max-h-[calc(100dvh-110px)] overflow-y-auto p-3 space-y-2">
+      {backHref && <CatalogBackLink href={backHref} restoreScroll={restoreBackScroll} onNavigate={() => setOpen(false)} className="liquid-pill w-full !justify-start" />}
+      <details className="soft-disclosure">
+        <summary className="liquid-pill w-full !justify-between">Категории<ChevronDown size={16} className="disclosure-chevron" /></summary>
+        <div className="menu-stack mt-2 pl-2">
+          <Link href="/" className="liquid-pill" onClick={() => setOpen(false)}>Все обои</Link>
+          <Link href="/category" className="liquid-pill" onClick={() => setOpen(false)}>Все категории</Link>
+          {categories.map(category => <Link key={category.id} className="liquid-pill" href={`/category/${encodeURIComponent(category.slug)}`} onClick={() => setOpen(false)}>{category.title}</Link>)}
           {loadingCategories && <p role="status">Загрузка…</p>}
         </div>
       </details>
-      <details>
-        <summary className="cursor-pointer font-semibold">Фильтр</summary>
-        <div className="mt-3">{renderFilter(() => setOpen(false))}</div>
+      <details className="soft-disclosure">
+        <summary className="liquid-pill w-full !justify-between">Фильтр<ChevronDown size={16} className="disclosure-chevron" /></summary>
+        <div className="mt-3 pb-2">{renderFilter(() => setOpen(false))}</div>
       </details>
-      <button onClick={() => act(onCart)} className="block font-semibold">Корзина{cartCount > 0 ? ` (${cartCount})` : ''}</button>
+      <button onClick={() => act(onCart)} className="liquid-pill w-full !justify-start">Корзина{cartCount > 0 ? ` (${cartCount})` : ''}</button>
       {authReady && (user ? <div className="border-t pt-3 space-y-3">
-        <Link href="/account" onClick={() => setOpen(false)} className="block">Профиль</Link>
-        <button onClick={() => act(onLogout)}>Выйти</button>
-      </div> : <button onClick={() => act(onLogin)} className="block">Войти</button>)}
+        <Link href="/account" onClick={() => setOpen(false)} className="liquid-pill w-full !justify-start">Профиль</Link>
+        <button onClick={() => act(onLogout)} className="liquid-pill w-full !justify-start">Выйти</button>
+      </div> : <button onClick={() => act(onLogin)} className="liquid-pill liquid-pill--accent w-full">Войти</button>)}
     </nav>}
   </div>;
 }

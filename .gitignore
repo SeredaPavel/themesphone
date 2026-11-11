@@ -43,3 +43,7 @@ Desktop.ini
 
 # Isolated local Docker data
 /.local/
+
+# MD
+AGENTS.MD
+VPS_DEPLOYMENT_THEMESPHONE.MD

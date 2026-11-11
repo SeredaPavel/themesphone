@@ -88,7 +88,7 @@ export default function TopWallpapersBanner() {
   if (loading || wallpapers.length === 0) return null
 
   return (
-    <section className="relative border border-[var(--foreground)] rounded-2xl p-4 flex flex-col gap-3">
+    <section className="form-panel relative flex flex-col gap-3">
       <div className="flex justify-between items-center mb-1">
         <h2 className="text-lg font-bold">🔥 Топ за неделю</h2>
         <Link
