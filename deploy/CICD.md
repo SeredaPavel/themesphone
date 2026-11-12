@@ -44,14 +44,46 @@ and setup on the working branch before merging into main. First push to main dep
    dump, uploads archive, and SHA256SUMS under `/opt/hosting/backups/themesphone/releases/`.
    Read the dump TOC. Resume previous apps if snapshot creation fails.
 5. Atomically select the new IMAGE_TAG, start apps without builds or pulls, wait for health.
-6. Check HTTPS through 127.0.0.1:9443 with certificate verification; also assert public
-   ThemesPhone endpoints still return 503 and GeoConverter/ProfitSite return 200.
+6. Check HTTPS with certificate verification using the configured `access-mode`:
+   public routing or the private preview listener. Verify the expected API restrictions
+   and GeoConverter/ProfitSite responses before declaring the release healthy.
 7. On failure attempt to restore previous env/images and verify routes. Report failure even
    if image rollback succeeds. Keep the data snapshot for manual recovery.
 
 This has short downtime for the snapshot and restart. These snapshots have no automatic
 retention/deletion or off-server replication; a general backup policy remains separate work.
-Previous image settings are also saved as `previous.env` and in `releases/`.
+Previous image settings are also saved in `releases/`. After a different SHA has passed
+all health/HTTPS checks, `previous.env` is atomically set to the release that was running
+before the update. A failed deployment or redeploy of the same SHA preserves the existing
+`previous.env`, so it continues to describe the previous stable release.
+
+## Local image retention on the VPS
+
+After a successful deploy, the installed script keeps the frontend/backend images for
+the current and previous stable SHAs. It then removes older ThemesPhone images only.
+Compose continues to replace the same application containers; the disk growth addressed
+here is downloaded images from past releases.
+
+Retention also preserves every image referenced by any container, including stopped
+containers and containers belonging to other applications. An image must have the exact
+ThemesPhone source/revision OCI labels and only recognised ThemesPhone SHA tags/digest
+references to qualify. Mixed repository references and unrecognised metadata are preserved.
+Owned untagged images can be removed if they are not current, previous or container-used.
+The release metadata, references and ownership are checked again before each removal.
+
+Removal uses exact image IDs with `docker image rm --no-prune`, without force, global
+prune, container removal or volume operations. GeoConverter, ProfitSite, PostgreSQL, Caddy,
+uploads, database data and release snapshots are outside this policy. Registry packages
+in GHCR are not deleted. A retention error reports a warning and keeps the verified release
+running; it never triggers application rollback. Missing/invalid rollback metadata skips
+cleanup until a subsequent distinct successful deploy establishes a valid previous release.
+
+To activate this change, install the reviewed `deploy-themesphone.sh` separately as
+`/usr/local/sbin/deploy-themesphone`: read/back up the existing script, take the existing
+ThemesPhone deploy lock, validate with `bash -n`, and replace only that file atomically.
+No Compose, Caddy, environment or SSH-key update is needed. Run the normal `check` command
+after installation; it is read-only and does not perform retention. The next successful
+deploy performs rotation. An application push alone does not update the server script.
 
 ## Recovery limits
 
@@ -64,7 +96,9 @@ not fully restored automatically on the resource-limited VPS.
 
 Tests simulate Docker/HTTP to exercise rejected commands, locks, preflight/pull/label failures,
 backup failures, successful snapshots, image/HTTP failures, rollback failure and preservation
-of other SSH keys. Actual Actions SSH/deployment and VPS rollback still need real verification.
+of other SSH keys. They also cover previous-stable metadata, same-SHA redeploys, retention
+failure, other repositories, mixed tags/digests, untagged images and stopped/concurrently
+created containers. These fixtures do not replace verification of the installed VPS script.
 
 ## Private preview
 

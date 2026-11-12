@@ -1,5 +1,6 @@
 """Deployment transition checks using fake Docker/HTTP; no VPS or real credentials."""
 import fcntl
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -10,6 +11,19 @@ import unittest
 SOURCE = Path(__file__).resolve().parents[1]
 OLD = 'a' * 40
 NEW = 'b' * 40
+ROLLBACK = 'c' * 40
+LEGACY = 'd' * 40
+
+def image_fixture(service, revision, repository=None, tags=None, source=None, salt=''):
+    repository = repository or 'ghcr.io/seredapavel/themesphone/' + service
+    return {
+        'Id': 'sha256:' + hashlib.sha256((repository + revision + salt).encode()).hexdigest(),
+        'RepoTags': [repository + ':' + revision] if tags is None else tags,
+        'RepoDigests': [],
+        'Config': {'Labels': {'org.opencontainers.image.source': source or 'https://github.com/SeredaPavel/themesphone',
+                              'org.opencontainers.image.revision': revision}},
+    }
+
 DOCKER = r'''#!/usr/bin/env python3
 import json, os, pathlib, sys
 args = sys.argv[1:]
@@ -23,11 +37,53 @@ if args[0] == 'exec':
     if scenario == 'promotion_reload_failure' and 'reload' in args and 'reverse_proxy' in (base / 'edge/Caddyfile').read_text(): sys.exit(9)
     sys.exit(0)
 if args[:2] == ['image', 'inspect']:
-    print(('0' if scenario == 'unsafe_image' else '1') if 'public-proxy-ready' in ' '.join(args) else ('wrong-revision' if scenario == 'bad_revision' else 'b' * 40))
+    if '--format' in args:
+        print(('0' if scenario == 'unsafe_image' else '1') if 'public-proxy-ready' in ' '.join(args) else ('wrong-revision' if scenario == 'bad_revision' else args[-1].rsplit(':', 1)[1]))
+    else:
+        images = json.loads((base / 'images.json').read_text())
+        result = []
+        for ref in args[2:]:
+            image = next((item for item in images if item['Id'] == ref or ref in item['RepoTags']), None)
+            if image is None: sys.exit(10)
+            result.append(image)
+        print(json.dumps(result))
+    sys.exit(0)
+if args[:2] == ['image', 'ls']:
+    print('\n'.join(item['Id'] for item in json.loads((base / 'images.json').read_text())))
+    sys.exit(0)
+if args[:2] == ['image', 'rm']:
+    if scenario == 'rotation_failure': sys.exit(9)
+    if len(args) != 4 or args[2] != '--no-prune': sys.exit(99)
+    images = json.loads((base / 'images.json').read_text())
+    (base / 'images.json').write_text(json.dumps([item for item in images if item['Id'] != args[3]]))
+    sys.exit(0)
+if args[:2] == ['ps', '-aq']:
+    queries = base / 'used-queries'
+    count = int(queries.read_text()) + 1 if queries.exists() else 1
+    queries.write_text(str(count))
+    extra = json.loads((base / 'extra-containers.json').read_text())
+    if scenario == 'image_became_used' and count >= 2:
+        extra['raced-id'] = (base / 'race-image-id').read_text()
+    print('\n'.join(['backend-id', 'frontend-id', *extra]))
     sys.exit(0)
 if args[0] == 'inspect':
-    service = 'backend' if args[-1] == 'backend-id' else 'frontend'
-    print('ghcr.io/seredapavel/themesphone/' + service + ':' + 'a' * 40)
+    runtime = base / 'runtime-sha'
+    sha = runtime.read_text() if runtime.exists() else 'a' * 40
+    if '{{.Image}}' in args:
+        extra = json.loads((base / 'extra-containers.json').read_text())
+        if scenario == 'image_became_used' and int((base / 'used-queries').read_text()) >= 2:
+            extra['raced-id'] = (base / 'race-image-id').read_text()
+        images = json.loads((base / 'images.json').read_text())
+        for identifier in args[args.index('--format') + 2:]:
+            if identifier in extra:
+                print(extra[identifier])
+            else:
+                service = 'backend' if identifier == 'backend-id' else 'frontend'
+                ref = 'ghcr.io/seredapavel/themesphone/' + service + ':' + sha
+                print(next(item['Id'] for item in images if ref in item['RepoTags']))
+    else:
+        service = 'backend' if args[-1] == 'backend-id' else 'frontend'
+        print('ghcr.io/seredapavel/themesphone/' + service + ':' + sha)
     sys.exit(0)
 if args[0] != 'compose': sys.exit(99)
 if 'ps' in args and '-q' in args:
@@ -52,6 +108,7 @@ if 'up' in args:
     with (base / 'ups').open('a') as f: f.write(tag + '\n')
     if scenario == 'startup_failure' and tag == 'b' * 40: sys.exit(8)
     if scenario == 'rollback_failure': sys.exit(8)
+    (base / 'runtime-sha').write_text(tag)
 sys.exit(0)
 '''
 CURL = r'''#!/usr/bin/env python3
@@ -85,6 +142,8 @@ class DeploymentTests(unittest.TestCase):
         self.deployment.mkdir()
         self.original = 'EXISTING_SETTING=preserved\nIMAGE_TAG=' + OLD + '\n'
         (self.deployment / '.env').write_text(self.original)
+        self.rollback_original = 'ROLLBACK_SETTING=preserved\nIMAGE_TAG=' + ROLLBACK + '\n'
+        (self.deployment / 'previous.env').write_text(self.rollback_original)
         (self.deployment / 'frontend.env').write_text('STRAPI_API_TOKEN=fake-test-value\n')
         (self.deployment / 'compose.yaml').write_text('name: themesphone\n')
         self.uploads = self.base / 'uploads'
@@ -92,6 +151,10 @@ class DeploymentTests(unittest.TestCase):
         (self.uploads / 'image.txt').write_text('fake-image')
         self.bin = self.base / 'bin'
         self.bin.mkdir()
+        self.images = [image_fixture(service, revision) for revision in (OLD, NEW, ROLLBACK, LEGACY)
+                       for service in ('backend', 'frontend')]
+        (self.base / 'images.json').write_text(json.dumps(self.images))
+        (self.base / 'extra-containers.json').write_text('{}')
         for name, text in [('docker', DOCKER), ('curl', CURL)]:
             p = self.bin / name
             p.write_text(text)
@@ -121,6 +184,13 @@ class DeploymentTests(unittest.TestCase):
 
     def assert_clean(self):
         self.assertEqual(list(self.deployment.glob('.env-next.*')), [])
+        self.assertEqual(list(self.deployment.glob('.previous-env-next.*')), [])
+
+    def calls(self):
+        return [json.loads(line) for line in (self.base / 'docker-calls').read_text().splitlines()]
+
+    def removed_images(self):
+        return {call[-1] for call in self.calls() if call[:2] == ['image', 'rm']}
 
     def test_check_is_read_only(self):
         result = self.run_script(command='check')
@@ -128,6 +198,7 @@ class DeploymentTests(unittest.TestCase):
         self.assertIn('READY: ThemesPhone', result.stdout)
         self.assertEqual(self.ups(), [])
         self.assertFalse((self.base / 'stopped').exists())
+        self.assertEqual(self.removed_images(), set())
 
     def test_denied_commands_never_reach_docker(self):
         for cmd in ['', 'bash', 'deploy latest', 'deploy ' + NEW + '; id',
@@ -157,6 +228,9 @@ class DeploymentTests(unittest.TestCase):
         up = next(i for i,c in enumerate(calls) if 'up' in c)
         self.assertLess(stop, dump)
         self.assertLess(dump, up)
+        self.assertEqual(self.removed_images(), {image['Id'] for image in self.images
+                                                if image['Config']['Labels']['org.opencontainers.image.revision'] in (ROLLBACK, LEGACY)})
+        self.assertIn('removed 4 old ThemesPhone images', result.stdout)
         self.assert_clean()
 
     def test_failures_before_stop_leave_running_release_untouched(self):
@@ -167,6 +241,8 @@ class DeploymentTests(unittest.TestCase):
                 self.assertEqual(self.ups(), [])
                 self.assertFalse((self.base / 'stopped').exists())
                 self.assertEqual((self.deployment / '.env').read_text(), self.original)
+                self.assertEqual((self.deployment / 'previous.env').read_text(), self.rollback_original)
+                self.assertEqual(self.removed_images(), set())
                 self.assert_clean()
 
     def test_snapshot_failures_resume_previous_apps_without_switching(self):
@@ -177,6 +253,8 @@ class DeploymentTests(unittest.TestCase):
                 self.assertNotEqual(result.returncode, 0)
                 self.assertEqual(self.ups(), [OLD])
                 self.assertEqual((self.deployment / '.env').read_text(), self.original)
+                self.assertEqual((self.deployment / 'previous.env').read_text(), self.rollback_original)
+                self.assertEqual(self.removed_images(), set())
                 self.assert_clean()
 
     def test_failed_release_restores_images_but_never_automatically_restores_db(self):
@@ -189,10 +267,87 @@ class DeploymentTests(unittest.TestCase):
                 self.assertEqual((self.deployment / '.env').read_text(), self.original)
                 self.assertIn('Previous application images and checked HTTPS routes restored.', result.stderr)
                 self.assertIn('NOT automatically restored', result.stderr)
+                self.assertEqual((self.deployment / 'previous.env').read_text(), self.rollback_original)
+                self.assertEqual(self.removed_images(), set())
                 calls = [json.loads(s) for s in (self.base / 'docker-calls').read_text().splitlines()]
                 restores = [c for c in calls if 'pg_restore' in c]
                 self.assertTrue(all('--list' in c for c in restores))
                 self.assert_clean()
+
+    def test_same_sha_redeploy_keeps_the_previous_stable_release(self):
+        result = self.run_script(command='deploy ' + OLD)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.ups(), [OLD])
+        self.assertEqual((self.deployment / 'previous.env').read_text(), self.rollback_original)
+        expected = {image['Id'] for image in self.images
+                    if image['Config']['Labels']['org.opencontainers.image.revision'] in (NEW, LEGACY)}
+        self.assertEqual(self.removed_images(), expected)
+
+    def test_missing_previous_metadata_skips_cleanup_on_same_sha_redeploy(self):
+        (self.deployment / 'previous.env').unlink()
+        result = self.run_script(command='deploy ' + OLD)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('retention was skipped or incomplete', result.stderr)
+        self.assertEqual(self.removed_images(), set())
+
+    def test_cleanup_failure_does_not_roll_back_a_verified_release(self):
+        result = self.run_script('rotation_failure')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.ups(), [NEW])
+        self.assertIn('SUCCESS: ThemesPhone deployed', result.stdout)
+        self.assertIn('retention was skipped or incomplete', result.stderr)
+        self.assertEqual((self.deployment / 'previous.env').read_text(), self.original)
+        self.assertIn('IMAGE_TAG=' + NEW, (self.deployment / '.env').read_text())
+
+    def test_rollback_metadata_write_failure_never_rotates_images(self):
+        path = self.deployment / 'previous.env'
+        path.unlink()
+        path.mkdir()
+        result = self.run_script()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(self.ups(), [NEW, OLD])
+        self.assertEqual(self.removed_images(), set())
+        self.assert_clean()
+
+    def test_retention_preserves_other_projects_shared_refs_and_stopped_containers(self):
+        foreign = image_fixture('backend', LEGACY, repository='ghcr.io/seredapavel/geoconverter-backend',
+                                source='https://github.com/SeredaPavel/geoconverter')
+        profit = image_fixture('frontend', LEGACY, repository='ghcr.io/seredapavel/profitsite/frontend',
+                               source='https://github.com/SeredaPavel/profitsite')
+        shared = image_fixture('backend', LEGACY, salt='shared-tags')
+        shared['RepoTags'].append('ghcr.io/seredapavel/geoconverter-backend:' + LEGACY)
+        digest = image_fixture('frontend', LEGACY, salt='shared-digest')
+        digest['RepoDigests'] = ['ghcr.io/seredapavel/profitsite/frontend@sha256:' + 'f' * 64]
+        latest = image_fixture('frontend', LEGACY, tags=['ghcr.io/seredapavel/themesphone/frontend:latest'], salt='latest')
+        unknown = image_fixture('backend', LEGACY, source='https://github.com/other/project', salt='unknown')
+        untagged_foreign = image_fixture('backend', LEGACY, tags=[], source='https://github.com/other/project', salt='foreign')
+        stopped = image_fixture('backend', 'e' * 40)
+        neighbour_used = image_fixture('frontend', 'f' * 40)
+        dangling = image_fixture('backend', LEGACY, tags=[], salt='dangling')
+        preserved = [foreign, profit, shared, digest, latest, unknown, untagged_foreign, stopped, neighbour_used]
+        self.images += preserved + [dangling]
+        (self.base / 'images.json').write_text(json.dumps(self.images))
+        (self.base / 'extra-containers.json').write_text(json.dumps({'stopped-id': stopped['Id'], 'neighbour-id': neighbour_used['Id']}))
+        result = self.run_script()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        remaining = json.loads((self.base / 'images.json').read_text())
+        for image in preserved:
+            self.assertIn(image, remaining)
+        self.assertNotIn(dangling, remaining)
+        self.assertEqual(len(self.removed_images()), 5)
+        for call in self.calls():
+            self.assertNotIn('prune', call)
+            self.assertNotIn('--force', call)
+            if call[:2] == ['image', 'rm']:
+                self.assertEqual(call[2], '--no-prune')
+
+    def test_image_that_becomes_used_during_retention_is_preserved(self):
+        raced = next(image for image in self.images if image['RepoTags'] == ['ghcr.io/seredapavel/themesphone/backend:' + LEGACY])
+        (self.base / 'race-image-id').write_text(raced['Id'])
+        result = self.run_script('image_became_used')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertNotIn(raced['Id'], self.removed_images())
+        self.assertEqual(len(self.removed_images()), 3)
 
     def test_rollback_failure_is_reported(self):
         result = self.run_script('rollback_failure')

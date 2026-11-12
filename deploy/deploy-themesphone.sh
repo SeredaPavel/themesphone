@@ -12,6 +12,7 @@ snapshot=
 previous=
 stopped=false
 switched=false
+committed=false
 
 compose() {
     docker compose --project-directory "$deployment_dir" --env-file "$deployment_dir/.env" \
@@ -79,6 +80,95 @@ verify_routes() {
     http_status 200 geoconverter.ru / public || return 1
     http_status 200 profitsite.ru / public || return 1
 }
+retain_application_images() {
+    python3 - "$deployment_dir/.env" "$deployment_dir/previous.env" <<'PYRETENTION'
+from pathlib import Path
+import json
+import re
+import subprocess
+import sys
+
+REPOSITORIES = {'ghcr.io/seredapavel/themesphone/' + service for service in ('backend', 'frontend')}
+SOURCE = 'https://github.com/seredapavel/themesphone'
+TAG = re.compile(r'ghcr\.io/seredapavel/themesphone/(?:backend|frontend):([a-f0-9]{40})')
+IMAGE_ID = re.compile(r'sha256:[a-f0-9]{64}')
+
+def sha(path):
+    matches = re.findall(r'^IMAGE_TAG=([a-f0-9]{40})$', Path(path).read_text(), re.M)
+    if len(matches) != 1:
+        raise ValueError('Expected one SHA-based IMAGE_TAG; image retention skipped.')
+    return matches[0]
+
+def docker(*args):
+    return subprocess.check_output(['docker', *args], text=True, timeout=30)
+
+def inspect_images(*refs):
+    return json.loads(docker('image', 'inspect', *refs))
+
+def used_images():
+    containers = docker('ps', '-aq', '--no-trunc').split()
+    if not containers:
+        return set()
+    return set(docker('inspect', '--format', '{{.Image}}', *containers).split())
+
+def owned(image):
+    labels = image.get('Config', {}).get('Labels') or {}
+    origin = labels.get('org.opencontainers.image.source', '').lower().removesuffix('.git').rstrip('/')
+    revision = labels.get('org.opencontainers.image.revision', '')
+    if origin != SOURCE or not re.fullmatch(r'[a-f0-9]{40}', revision):
+        return False
+    for tag in image.get('RepoTags') or []:
+        match = TAG.fullmatch(tag)
+        if not match or match[1] != revision:
+            return False
+    if any(ref.split('@', 1)[0] not in REPOSITORIES for ref in image.get('RepoDigests') or []):
+        return False
+    return bool(IMAGE_ID.fullmatch(image.get('Id', '')))
+
+def retain():
+    current, previous = (sha(path) for path in sys.argv[1:])
+    keep_refs = {repo + ':' + revision for repo in REPOSITORIES for revision in (current, previous)}
+    protected = inspect_images(*sorted(keep_refs))
+    for ref in keep_refs:
+        matches = [image for image in protected if ref in (image.get('RepoTags') or [])]
+        if len(matches) != 1 or not owned(matches[0]):
+            raise ValueError('Current or previous image metadata is inconsistent; retention skipped.')
+    keep_ids = {image['Id'] for image in protected}
+    used = used_images()
+    current_ids = {image['Id'] for image in protected
+                   if any(ref.endswith(':' + current) for ref in image.get('RepoTags') or [])}
+    if not current_ids.issubset(used):
+        raise ValueError('Current application images are not in use; retention skipped.')
+    identifiers = sorted(set(docker('image', 'ls', '-aq', '--no-trunc').split()))
+    images = inspect_images(*identifiers) if identifiers else []
+    candidates = [image for image in images if owned(image) and image['Id'] not in keep_ids | used]
+    removed = failures = 0
+    for candidate in candidates:
+        if (sha(sys.argv[1]), sha(sys.argv[2])) != (current, previous):
+            raise ValueError('Release metadata changed; remaining images preserved.')
+        image = inspect_images(candidate['Id'])[0]
+        if (not owned(image) or image['Id'] in keep_ids | used_images()
+                or keep_refs.intersection(image.get('RepoTags') or [])):
+            continue
+        # No force, parent pruning, container removal, volumes or other repositories.
+        result = subprocess.run(['docker', 'image', 'rm', '--no-prune', image['Id']],
+                                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=45)
+        if result.returncode:
+            failures += 1
+            print('WARNING: could not remove an unused ThemesPhone image; preserved.', file=sys.stderr)
+        else:
+            removed += 1
+    print(f'Image retention: current {current}, previous {previous}; removed {removed} old ThemesPhone images.')
+    return 1 if failures else 0
+
+try:
+    status = retain()
+except (OSError, ValueError, KeyError, subprocess.SubprocessError) as error:
+    print(f'WARNING: ThemesPhone image retention incomplete: {error}', file=sys.stderr)
+    status = 1
+sys.exit(status)
+PYRETENTION
+}
 if [[ "$request" == check ]]; then
     check_files
     verify_routes
@@ -104,7 +194,9 @@ fail() {
     local status=$1
     trap - ERR INT TERM HUP
     echo "ThemesPhone deployment failed (exit $status)." >&2
-    if [[ "$stopped" == true ]]; then
+    if [[ "$committed" == true ]]; then
+        echo 'The release already passed verification; application images are retained.' >&2
+    elif [[ "$stopped" == true ]]; then
         if restore_images; then
             echo 'Previous application images and checked HTTPS routes restored.' >&2
         else
@@ -185,8 +277,7 @@ tar --numeric-owner -czf "$snapshot/uploads.tar.gz" -C "$uploads_dir" .
 printf '%s\n' "$release_sha" > "$snapshot/requested-sha"
 echo "Pre-deploy snapshot created: $snapshot"
 
-# Preserve previous settings separately; all files are private (umask 077).
-install -m 0600 "$previous" "$deployment_dir/previous.env"
+# Keep the snapshot even if this deployment fails; publish previous.env only on success.
 install -m 0600 "$previous" "$deployment_dir/releases/$(basename "$snapshot").env"
 switched=true
 mv -- "$candidate" "$deployment_dir/.env"
@@ -195,5 +286,17 @@ compose up -d --no-build --pull never --wait --wait-timeout 240 \
     themesphone-backend themesphone-frontend </dev/null
 verify_routes
 compose ps </dev/null
+# A failed release or a repeated deploy of the same SHA must not replace the rollback version.
+if [[ "$release_sha" != "$previous_sha" ]]; then
+    candidate=$(mktemp "$deployment_dir/.previous-env-next.XXXXXX")
+    install -m 0600 "$previous" "$candidate"
+    mv -T -- "$candidate" "$deployment_dir/previous.env"
+    candidate=
+fi
+committed=true
+# Cache maintenance is optional: failure must never roll back a healthy verified release.
+if ! retain_application_images; then
+    echo 'WARNING: deploy succeeded, but image retention was skipped or incomplete.' >&2
+fi
 echo "SUCCESS: ThemesPhone deployed from $release_sha."
 echo "Data snapshot: $snapshot"
