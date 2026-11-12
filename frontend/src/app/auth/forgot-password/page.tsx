@@ -1,6 +1,7 @@
 import { Suspense } from 'react';
 import RecoveryForm from '@/components/auth/RecoveryForm';
+import AuthPanel, { AuthScreen, AuthStack } from '@/components/auth/AuthSurface';
 export const metadata={title:'Восстановление пароля · ThemesPhone',robots:{index:false,follow:false},referrer:'no-referrer' as const};
 export default function ForgotPasswordPage() {
-  return <div className="px-5 py-10 sm:py-16"><Suspense fallback={<p className="text-center">Загрузка…</p>}><RecoveryForm/></Suspense></div>;
+  return <AuthScreen><Suspense fallback={<AuthPanel title="Восстановление пароля"><AuthStack><p role="status" className="auth-copy">Загрузка…</p></AuthStack></AuthPanel>}><RecoveryForm/></Suspense></AuthScreen>;
 }

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import FormField from '@/components/FormField';
 import PasswordField from '@/components/PasswordField';
+import AuthPanel, { AuthNotice, AuthStack } from './AuthSurface';
 
 export default function RecoveryForm({reset=false}:{reset?:boolean}) {
   const params=useSearchParams();
@@ -33,25 +34,26 @@ export default function RecoveryForm({reset=false}:{reset?:boolean}) {
     } catch(error) {setError(error instanceof Error?error.message:'Нет соединения. Повторите позже');}
     finally {setBusy(false);}
   }
-  return <section className="form-panel w-full max-w-lg mx-auto">
-    <p className="form-eyebrow mb-3">ThemesPhone · Личный кабинет</p>
-    <h1 className="!text-4xl sm:!text-5xl mb-4">{setup?'Создание пароля':reset?'Новый пароль':'Восстановление пароля'}</h1>
-    {done ? <div className="space-y-5">
-      <p role="status" className="form-message">{setup?'Пароль создан. Теперь можно входить по email и паролю или через подключённый сервис.':reset?'Пароль изменён. Теперь войдите с новым паролем.':'Если аккаунт с таким email существует, на него отправлена ссылка восстановления. Проверьте входящие и папку «Спам».'}</p>
-      <Link href="/?auth=popup" className="liquid-pill liquid-pill--accent">Вернуться ко входу</Link>
-    </div> : invalidCode ? <div className="space-y-5">
-      <p role="alert" className="form-message form-message--error">Ссылка восстановления отсутствует или некорректна.</p>
-      <Link href={newLink} className="liquid-pill">{setup?'Получить ссылку в кабинете':'Получить новую ссылку'}</Link>
-    </div> : <form onSubmit={submit} className="flex flex-col gap-5">
-      <p className="form-muted text-sm leading-relaxed">{reset?'Придумайте пароль от 10 до 256 символов. Ссылка действует один час и может быть использована только один раз.':'Введите email вашего аккаунта. Мы отправим ссылку, по которой можно задать новый пароль.'}</p>
-      {reset ? <>
-        <PasswordField label="Новый пароль" value={password} onChange={event=>setPassword(event.target.value)} autoComplete="new-password" required minLength={10} maxLength={256} disabled={busy}/>
-        <PasswordField label="Повторите пароль" value={repeat} onChange={event=>setRepeat(event.target.value)} autoComplete="new-password" required minLength={10} maxLength={256} disabled={busy}/>
-      </> : <FormField label="Email" type="email" placeholder="name@example.com" value={email} onChange={event=>setEmail(event.target.value)} autoComplete="email" maxLength={254} required disabled={busy}/>}
-      {error && <p role="alert" className="form-message form-message--error">{error}</p>}
-      {reset && error && <Link href={newLink} className="text-sm underline">{setup?'Запросить ссылку в кабинете':'Запросить новую ссылку'}</Link>}
-      <button type="submit" disabled={busy} className="liquid-pill liquid-pill--accent self-start">{busy?'Подождите…':reset?'Сохранить новый пароль':'Отправить ссылку'}</button>
-      <Link href="/?auth=popup" className="form-muted text-sm underline self-start">Вернуться ко входу</Link>
+  const title=setup?'Создание пароля':reset?'Новый пароль':'Восстановление пароля';
+  return <AuthPanel title={title}>
+    {done ? <AuthStack>
+      <AuthNotice key="success" kind="success">{setup?'Пароль создан. Теперь можно входить по email и паролю или через подключённый сервис.':reset?'Пароль изменён. Теперь войдите с новым паролем.':'Если аккаунт с таким email существует, на него отправлена ссылка восстановления. Проверьте входящие и папку «Спам».'}</AuthNotice>
+      <Link key="back" href="/?auth=popup" className="auth-button auth-button--primary">Вернуться ко входу</Link>
+    </AuthStack> : invalidCode ? <AuthStack>
+      <AuthNotice key="invalid" kind="error">Ссылка восстановления отсутствует или некорректна.</AuthNotice>
+      <Link key="new-link" href={newLink} className="auth-button">{setup?'Получить ссылку в кабинете':'Получить новую ссылку'}</Link>
+      <Link key="back" href="/?auth=popup" className="auth-link">Вернуться ко входу</Link>
+    </AuthStack> : <form onSubmit={submit} aria-label={title}>
+      <AuthStack>
+        <p key="help" className="auth-copy">{reset?'Придумайте пароль от 10 до 256 символов. Ссылка действует один час и может быть использована только один раз.':'Введите email вашего аккаунта. Мы отправим ссылку, по которой можно задать новый пароль.'}</p>
+        {reset && <PasswordField key="password" label="Новый пароль" value={password} onChange={event=>setPassword(event.target.value)} autoComplete="new-password" required minLength={10} maxLength={256} disabled={busy}/>}
+        {reset && <PasswordField key="repeat" label="Повторите пароль" value={repeat} onChange={event=>setRepeat(event.target.value)} autoComplete="new-password" required minLength={10} maxLength={256} disabled={busy}/>}
+        {!reset && <FormField key="email" label="Email" type="email" placeholder="name@example.com" value={email} onChange={event=>setEmail(event.target.value)} autoComplete="email" maxLength={254} required disabled={busy}/>}
+        {error && <AuthNotice key="error" kind="error">{error}</AuthNotice>}
+        {reset && error && <Link key="resend" href={newLink} className="auth-link">{setup?'Запросить ссылку в кабинете':'Запросить новую ссылку'}</Link>}
+        <button key="submit" type="submit" disabled={busy} className="auth-button auth-button--primary">{busy?'Подождите…':reset?'Сохранить новый пароль':'Отправить ссылку'}</button>
+        <Link key="back" href="/?auth=popup" className="auth-link">Вернуться ко входу</Link>
+      </AuthStack>
     </form>}
-  </section>;
+  </AuthPanel>;
 }
