@@ -88,7 +88,7 @@ export async function oauthProviders(req:Request) {
     return json(data);
   } catch {return json({providers:providers.map(provider=>({provider,enabled:false}))});}
 }
-export async function oauthAction(req:Request,action:'pending'|'register'|'connections'|'unlink') {
+export async function oauthAction(req:Request,action:'pending'|'register'|'connections'|'unlink'|'account') {
   let origin;
   try {
     origin=req.method==='GET'?publicOrigin(req):requestOrigin(req);
@@ -96,7 +96,14 @@ export async function oauthAction(req:Request,action:'pending'|'register'|'conne
   } catch {return json({error:'Недопустимый источник запроса'},403);}
   try {
     const fields=req.method==='GET'?{}:await input(req);
-    const {data,status,ok}=await bridge(req,origin,action,{pending:cookie(req,'oauth_pending'),email:fields.email,provider:fields.provider});
+    let serverAction:string=action;
+    if(action==='account') {
+      if(fields.action==='add-email') serverAction='requestEmail';
+      else if(fields.action==='create-password') serverAction='requestPassword';
+      else if(fields.action===undefined) serverAction='unlink';
+      else return json({error:'Некорректное действие'},400);
+    }
+    const {data,status,ok}=await bridge(req,origin,serverAction,{pending:cookie(req,'oauth_pending'),email:fields.email,provider:fields.provider});
     if(!ok) return json({error:oauthMessages[data.error] || 'Сервис временно недоступен',code:data.error},status);
     const response=json(data);
     if(action==='register') response.headers.append('Set-Cookie',temporaryCookie('oauth_pending','',origin,0));

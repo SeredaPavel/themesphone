@@ -18,8 +18,7 @@ export default async function AccountPage() {
       {/* Левая колонка */}
       <div className="flex flex-col gap-6">
         <ProfileBlock user={user} />
-        <PasswordBlock />
-        {process.env.OAUTH_ENABLED==='true' && <ConnectionsBlock />}
+        {process.env.OAUTH_ENABLED==='true' ? <ConnectionsBlock email={user.email} /> : <PasswordBlock email={user.email} />}
       </div>
 
       {/* Правая колонка */}

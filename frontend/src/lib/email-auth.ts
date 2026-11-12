@@ -1,4 +1,4 @@
-type PublicUser = { id: number; username: string; email: string; confirmed: boolean; firstname?:string; lastname?:string; phone?:string; billingAddress?:string };
+type PublicUser = { id: number; username: string; email: string|null; confirmed: boolean; firstname?:string; lastname?:string; phone?:string; billingAddress?:string };
 
 function json(body: unknown, status = 200, cookie?: string) {
   return Response.json(body, { status, headers: { 'Cache-Control': 'no-store', ...(cookie ? { 'Set-Cookie': cookie } : {}) } });
@@ -17,8 +17,8 @@ export function sessionCookie(token: string, clear = false) {
   return 'token=' + encodeURIComponent(token) + '; Path=/; HttpOnly; SameSite=Lax; Max-Age=' + (clear ? 0 : 604800) + (secure ? '; Secure' : '');
 }
 function publicUser(user: any): PublicUser {
-  if (!user || !Number.isInteger(user.id) || typeof user.email !== 'string' || user.blocked || user.confirmed !== true) throw new Error('Invalid user');
-  const result: PublicUser = { id: user.id, username: user.username, email: user.email, confirmed: true };
+  if (!user || !Number.isInteger(user.id) || (user.email!=null && typeof user.email !== 'string') || user.blocked || user.confirmed !== true) throw new Error('Invalid user');
+  const result: PublicUser = { id: user.id, username: user.username, email: user.email || null, confirmed: true };
   for (const key of ['firstname','lastname','phone','billingAddress'] as const) if (typeof user[key] === 'string') result[key] = user[key];
   return result;
 }

@@ -5,6 +5,7 @@ function extendAuth(controller) {
   const reset = controller.resetPassword;
   const change = controller.changePassword;
   const register = controller.register;
+  const confirmation = controller.emailConfirmation;
   return {...controller, register: async ctx => {
     const email=ctx.request.body?.email;
     if(typeof email!=='string' || strapi.config.get('database.connection.client')!=='postgres') return register(ctx);
@@ -20,6 +21,17 @@ function extendAuth(controller) {
     if (typeof email !== 'string' || ctx.status >= 400) return;
     const user = await strapi.db.query('plugin::users-permissions.user').findOne({where:{email:email.toLowerCase(),blocked:false}});
     if (user?.resetPasswordToken) await strapi.db.query('plugin::users-permissions.user').update({where:{id:user.id},data:{resetPasswordExpiresAt:new Date(Date.now()+60*60*1000)}});
+  }, emailConfirmation: async (...args) => {
+    const ctx=args[0],code=ctx.query?.confirmation;
+    if(typeof code==='string' && /^[a-f0-9]{40}$/.test(code)) {
+      let handled;
+      try {handled=await require('../../lib/oauth-account-links').confirmAccountEmail(strapi,code);} catch {return ctx.badRequest('Invalid confirmation link');}
+      if(handled) {
+        const settings=await strapi.store({type:'plugin',name:'users-permissions'}).get({key:'advanced'});
+        return ctx.redirect(settings.email_confirmation_redirection || '/');
+      }
+    }
+    return confirmation(...args);
   }, resetPassword: async ctx => {
     const code = ctx.request.body?.code;
     if (typeof code !== 'string' || !/^[a-f0-9]{128}$/.test(code)) return ctx.badRequest('Invalid reset link');
@@ -30,8 +42,12 @@ function extendAuth(controller) {
       if (!row) return ctx.badRequest('Invalid reset link');
       const user = await strapi.db.query('plugin::users-permissions.user').findOne({where:{resetPasswordToken:code}});
       if (!user || user.blocked || !user.resetPasswordExpiresAt || new Date(user.resetPasswordExpiresAt).getTime() <= Date.now()) return ctx.badRequest('Invalid reset link');
+      let setup;
+      try {setup=await require('../../lib/oauth-account-links').passwordSetup(strapi,trx,user,code);} catch {return ctx.badRequest('Invalid reset link');}
       await reset(ctx);
-      await strapi.db.query('plugin::users-permissions.user').update({where:{id:user.id},data:{resetPasswordExpiresAt:null}});
+      if(ctx.status>=400) return;
+      await strapi.db.query('plugin::users-permissions.user').update({where:{id:user.id},data:{resetPasswordExpiresAt:null,...(setup?{email:setup.payload.email}:{})}});
+      if(setup) await strapi.db.query('api::oauth-flow.oauth-flow').update({where:{id:setup.id},data:{consumedAt:new Date()}});
       ctx.send({ok:true});
     });
   }, changePassword: async ctx => {

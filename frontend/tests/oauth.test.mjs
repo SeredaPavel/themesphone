@@ -43,3 +43,19 @@ test('pending identity uses HttpOnly ticket and onboarding whitelists input',asy
   const res=await oauthAction(new Request('https://themesphone.ru/api/auth/oauth/register',{method:'POST',headers:{Origin:'https://themesphone.ru',Cookie:'oauth_pending='+ 'p'.repeat(43)},body:JSON.stringify({email:'user@example.test',userId:123,confirmed:true})}),'register');
   assert.equal(res.status,200);assert.match(res.headers.get('set-cookie'),/oauth_pending=;.*Max-Age=0/);
 });
+test('account link actions use the signed-in session and never accept a user ID or token from the body',async()=>{
+  setup();
+  for(const [action,expected] of [['add-email','requestEmail'],['create-password','requestPassword']]) {
+    const fetch=mock.method(globalThis,'fetch',async(_url,options)=>{
+      const data=JSON.parse(options.body);
+      assert.equal(data.action,expected);assert.equal(data.token,'own-session');assert.equal(data.userId,undefined);
+      assert.equal(data.email,'owner@example.test');
+      return Response.json({mailSent:true});
+    });
+    const response=await oauthAction(new Request('https://themesphone.ru/api/account/connections',{method:'POST',headers:{Origin:'https://themesphone.ru',Cookie:'token=own-session'},body:JSON.stringify({action,email:'owner@example.test',userId:99,token:'forged'})}),'account');
+    assert.equal(response.status,200);assert.equal(fetch.mock.callCount(),1);mock.restoreAll();
+  }
+  const fetch=mock.method(globalThis,'fetch',()=>{throw Error('Unexpected request');});
+  const response=await oauthAction(new Request('https://themesphone.ru/api/account/connections',{method:'POST',headers:{Origin:'https://themesphone.ru'},body:JSON.stringify({action:'set-password',password:'forged'})}),'account');
+  assert.equal(response.status,400);assert.equal(fetch.mock.callCount(),0);
+});

@@ -33,11 +33,6 @@ function createOAuthService(strapi, providerApi=providers) {
     const model = strapi.db.metadata.get(USER);
     await trx(model.tableName).where('id',id).forUpdate().first();
   }
-  async function saveFlow(payload,minutes=10) {
-    const ticket = providerApi.random();
-    await query(FLOW).create({data:{key:providerApi.digest(ticket),payload,expiresAt:new Date(Date.now()+minutes*60000)}});
-    return ticket;
-  }
   async function readFlow(ticket,origin,stage,trx) {
     if(!capability(ticket)) throw new OAuthError('invalid_flow');
     const key = providerApi.digest(ticket);
@@ -112,8 +107,26 @@ function createOAuthService(strapi, providerApi=providers) {
       }
       const identity = await query(IDENTITY).findOne({where:{key},populate:['user']});
       if(identity?.user) return tokenFor(identity.user.id);
-      const pending = await saveFlow({stage:'register',origin:input.origin,provider:input.provider,subject:profile.subject,email:profile.email || ''},15);
-      return {pending};
+      const user = await strapi.db.transaction(async({trx})=>{
+        await trx.raw('SELECT pg_advisory_xact_lock(hashtext(?))',['themesphone:identity:'+key]);
+        const existing = await query(IDENTITY).findOne({where:{key},populate:['user']});
+        if(existing?.user) return existing.user;
+        // A provider email may identify an existing account, but never grants permission to merge it.
+        const suggested = typeof profile.email==='string'?profile.email.trim().toLowerCase():'';
+        if(suggested) {
+          await emailLock(trx,suggested);
+          if(await query(USER).findOne({where:{$or:[{email:{$eqi:suggested}},{username:suggested}]}})) throw new OAuthError('account_exists',409);
+        }
+        const settings = await strapi.store({type:'plugin',name:'users-permissions'}).get({key:'advanced'});
+        if(!settings.allow_register) throw new OAuthError('registration_closed',403);
+        const role = await query('plugin::users-permissions.role').findOne({where:{type:settings.default_role}});
+        if(!role) throw new OAuthError('service_unavailable',503);
+        // OAuth proves the service identity. Email remains absent until the owner chooses to add it.
+        const created = await userService().add({username:'oauth_'+providerApi.random(),email:null,provider:'local',confirmed:true,blocked:false,role:role.id});
+        await query(IDENTITY).create({data:{key,provider:input.provider,subject:profile.subject,user:created.id}});
+        return created;
+      });
+      return tokenFor(user.id);
     },
     async pending(input) {
       const flow = await readFlow(input.pending,input.origin,'register');
@@ -146,7 +159,15 @@ function createOAuthService(strapi, providerApi=providers) {
     async connections(input) {
       const user = await current(input.token);
       const identities = await query(IDENTITY).findMany({where:{user:user.id}});
-      return {hasPassword:!!user.password,connections:providerApi.PROVIDERS.map(provider=>({provider,enabled:providerApi.configured(provider),linked:identities.some(identity=>identity.provider===provider)}))};
+      return {email:user.email || null,hasPassword:!!user.password,connections:providerApi.PROVIDERS.map(provider=>({provider,enabled:providerApi.configured(provider),linked:identities.some(identity=>identity.provider===provider)}))};
+    },
+    async requestEmail(input) {
+      const user = await current(input.token);
+      return require('./oauth-account-links').requestAccountLink(strapi,input,user,'email');
+    },
+    async requestPassword(input) {
+      const user = await current(input.token);
+      return require('./oauth-account-links').requestAccountLink(strapi,input,user,'password');
     },
     async unlink(input) {
       if(!providerApi.PROVIDERS.includes(input.provider)) throw new OAuthError('invalid_provider');

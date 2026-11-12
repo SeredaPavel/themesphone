@@ -10,12 +10,13 @@ function installPlainText(strapi) {
   const send=service.send.bind(service);
   service.send=options=>send(options.html && (!options.text || options.text===options.html) ? {...options,text:plainText(options.html)} : options);
 }
+const emailFrame=(title,text,link,button,footer)=>`<!doctype html><html lang="ru"><head><meta charset="utf-8"></head><body style="margin:0;background:#edf4f3;font-family:Arial,sans-serif;color:#13494f"><div style="max-width:560px;margin:24px auto;padding:32px;background:#ffffff;border:1px solid #d6e2e3;border-radius:24px"><p style="font-size:18px">ThemesPhone</p><h1 style="font-size:26px;font-weight:400">${title}</h1><p style="line-height:1.7">${text}</p><p style="margin:28px 0"><a href="${link}" style="display:inline-block;padding:12px 22px;background:#e97070;color:white;text-decoration:none;border-radius:28px">${button}</a></p><p style="font-size:13px;line-height:1.7;color:#6d8387">${footer}</p><p style="font-size:13px;line-height:1.7">Если кнопка не работает, откройте эту ссылку:<br><a href="${link}">${link}</a></p></div></body></html>`;
 function emailSettings(frontendUrl,senderAddress) {
   const url=new URL(frontendUrl);
   if(!['https:','http:'].includes(url.protocol) || url.username || url.password || url.search || url.hash || url.pathname!=='/') throw Error('Invalid frontend URL');
   if(url.protocol!=='https:' && !['localhost','127.0.0.1'].includes(url.hostname)) throw Error('HTTPS is required for public email links');
   if(!/^[^\s<>@]+@[^\s<>@]+\.[^\s<>@]+$/.test(senderAddress)) throw Error('Invalid sender address');
-  const frame=(title,text,link,button,footer)=>`<!doctype html><html lang="ru"><head><meta charset="utf-8"></head><body style="margin:0;background:#edf4f3;font-family:Arial,sans-serif;color:#13494f"><div style="max-width:560px;margin:24px auto;padding:32px;background:#ffffff;border:1px solid #d6e2e3;border-radius:24px"><p style="font-size:18px">ThemesPhone</p><h1 style="font-size:26px;font-weight:400">${title}</h1><p style="line-height:1.7">${text}</p><p style="margin:28px 0"><a href="${link}" style="display:inline-block;padding:12px 22px;background:#e97070;color:white;text-decoration:none;border-radius:28px">${button}</a></p><p style="font-size:13px;line-height:1.7;color:#6d8387">${footer}</p><p style="font-size:13px;line-height:1.7">Если кнопка не работает, откройте эту ссылку:<br><a href="${link}">${link}</a></p></div></body></html>`;
+  const frame=emailFrame;
   return {
     confirmationRedirect:url.origin+'/confirmation/submit', resetUrl:url.origin+'/auth/reset-password',
     confirmation:{from:{name:'ThemesPhone',email:senderAddress},response_email:senderAddress,
@@ -51,4 +52,4 @@ async function configureEmailAuth(strapi) {
   }
   strapi.log.info('ThemesPhone email authentication settings applied (credentials are not logged).');
 }
-module.exports={emailSettings,configureEmailAuth,plainText,installPlainText};
+module.exports={emailSettings,configureEmailAuth,plainText,installPlainText,emailFrame};

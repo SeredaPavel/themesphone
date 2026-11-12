@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-type User = { id:number; username:string; email:string };
+type User = { id:number; username:string; email:string|null };
 export function useAuth() {
   const [user,setUser] = useState<User|null>(null);
   const [loading,setLoading] = useState(true);

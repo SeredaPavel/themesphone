@@ -55,3 +55,10 @@ test('local HTTP cookies work in a production preview; malformed cookie is rejec
   assert.doesNotMatch(sessionCookie('abc.def.ghi'),/; Secure/);
   assert.equal((await me(new Request('http://127.0.0.1:3100/api/me',{headers:{Cookie:'token=%ZZ'}}))).status,401);
 });
+test('an authenticated OAuth user without email can load the account without exposing private fields',async()=>{
+  process.env.STRAPI_API_URL='http://cms:1337';
+  mock.method(globalThis,'fetch',async()=>Response.json({id:7,username:'oauth_test',email:null,confirmed:true,password:'private',resetPasswordToken:'private'}));
+  const response=await me(new Request('https://shop.example/api/me',{headers:{Cookie:'token=abc.def.ghi'}}));
+  assert.equal(response.status,200);
+  assert.deepEqual(await response.json(),{id:7,username:'oauth_test',email:null,confirmed:true});
+});

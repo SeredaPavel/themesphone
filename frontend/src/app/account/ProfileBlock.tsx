@@ -31,12 +31,12 @@ export default function ProfileBlock({ user }: { user: any }) {
   }
   return <form onSubmit={submit} aria-label="Мой профиль" className="form-panel flex flex-col gap-5">
     <h2>Мой профиль</h2>
-    <div aria-hidden="true" className="w-20 h-20 rounded-full bg-[#deeded] text-[#337780] flex items-center justify-center text-2xl mx-auto">{(saved.firstname || user.username || user.email || '?').slice(0, 1).toUpperCase()}</div>
+    <div aria-hidden="true" className="w-20 h-20 rounded-full bg-[#deeded] text-[#337780] flex items-center justify-center text-2xl mx-auto">{(saved.firstname || user.email || '?').slice(0, 1).toUpperCase()}</div>
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
       <FormField label="Имя" value={draft.firstname} onChange={event=>change('firstname',event.target.value)} disabled={!editing || busy} maxLength={80} placeholder="Ваше имя" autoComplete="given-name" />
       <FormField label="Фамилия" value={draft.lastname} onChange={event=>change('lastname',event.target.value)} disabled={!editing || busy} maxLength={80} placeholder="Ваша фамилия" autoComplete="family-name" />
     </div>
-    <FormField label="Подтверждённый email" type="email" value={user.email} readOnly autoComplete="email" />
+    {user.email?<FormField label="Подтверждённый email" type="email" value={user.email} readOnly autoComplete="email" />:<p className="text-sm form-muted">Почта не добавлена. <a href="#account-password" className="underline">Добавить почту</a></p>}
     <FormField label="Телефон" type="tel" value={draft.phone} onChange={event=>change('phone',event.target.value)} disabled={!editing || busy} maxLength={32} placeholder="Номер телефона" autoComplete="tel" />
     <FormField label="Адрес выставления счёта" value={draft.billingAddress} onChange={event=>change('billingAddress',event.target.value)} disabled={!editing || busy} maxLength={300} placeholder="Ваш адрес" autoComplete="street-address" />
     {error && <p role="alert" className="form-message form-message--error">{error}</p>}
