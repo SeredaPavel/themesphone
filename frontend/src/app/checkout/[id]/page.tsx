@@ -1,11 +1,14 @@
 'use client';
 
-import { Suspense, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import PaymentPopup from '@/components/PaymentPopup';
 import DownloadPopup from '@/components/DownloadPopup';
+import CommerceNotice from '@/components/CommerceNotice';
 
-function CheckoutContent() {
+// Заготовка остаётся для этапа серверных заказов и оплаты; пока не монтируется.
+function LegacyCheckoutContent() {
   const { id } = useParams();
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -112,9 +115,9 @@ function CheckoutContent() {
   );
 }
 export default function CheckoutPage() {
-  return (
-    <Suspense fallback={<p>Загрузка...</p>}>
-      <CheckoutContent />
-    </Suspense>
-  );
+  return <section className="max-w-2xl mx-auto p-6 space-y-6">
+    <h1>Оформление заказа</h1>
+    <CommerceNotice action="checkout" />
+    <Link href="/cart" className="liquid-pill">Вернуться в корзину</Link>
+  </section>;
 }

@@ -4,11 +4,12 @@
 import Link from 'next/link';
 import { useCart } from '@/context/CartContext';
 import { useAuthContext } from '@/context/AuthContext';
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import AuthModal from './AuthModal';
 import { wallpaperDetailHref } from '@/lib/catalog-query';
 import { rememberCatalogScroll } from '@/lib/catalog-scroll';
+import CommerceNotice, { commerceMessages } from './CommerceNotice';
 
 type Props = {
   id: number;
@@ -37,7 +38,7 @@ export default function WallpaperCard({
 }: Props) {
   const detailUrl = wallpaperDetailHref(documentId || String(id), returnTo);
   const rememberPosition = () => { if (returnTo) rememberCatalogScroll(returnTo); };
-  const downloadUrl = `/api/download?url=${encodeURIComponent(imageUrl)}&name=${encodeURIComponent(title)}.jpg`;
+  const availabilityId = useId();
   const { addToCart } = useCart();
   const { user } = useAuthContext();
   const [added, setAdded] = useState(false);
@@ -134,16 +135,22 @@ export default function WallpaperCard({
 
               <div className="mt-2 flex flex-wrap gap-2">
                 {isFree ? (
-                  <a
-                    href={downloadUrl}
+                  <button
+                    type="button"
+                    disabled
+                    aria-describedby={availabilityId}
+                    title={commerceMessages.download}
                     className="liquid-pill !px-3 !py-1.5"
                   >
                     Загрузить
-                  </a>
+                  </button>
                 ) : (
                   <>
                     <button
                       onClick={handleBuyNow}
+                      disabled
+                      aria-describedby={availabilityId}
+                      title={commerceMessages.purchase}
                       className="liquid-pill !px-3 !py-1.5"
                     >
                       Купить сейчас
@@ -161,6 +168,7 @@ export default function WallpaperCard({
                   </>
                 )}
               </div>
+              <CommerceNotice id={availabilityId} action={isFree ? 'download' : 'purchase'} compact />
             </>
           )}
         </div>

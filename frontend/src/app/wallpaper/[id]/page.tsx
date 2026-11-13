@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { notFound, permanentRedirect } from 'next/navigation';
 import { getDescriptionParagraphs, getWallpaper, getWallpaperImageUrl } from '@/lib/wallpaper.server';
 import { safeCatalogReturn, wallpaperDetailHref } from '@/lib/catalog-query';
+import CommerceNotice from '@/components/CommerceNotice';
 
 export const dynamic = 'force-dynamic';
 
@@ -68,11 +69,7 @@ export default async function WallpaperDetailPage({ params, searchParams }: {
       <div className="space-y-3 mb-6 whitespace-pre-wrap">
         {paragraphs.length ? paragraphs.map((paragraph, index) => <p key={index}>{paragraph}</p>) : <p>Описание пока не добавлено.</p>}
       </div>
-      <p className="rounded-xl border p-4 text-sm" role="status">
-        {wallpaper.isFree
-          ? 'Скачивание временно недоступно. Мы готовим эту функцию к запуску.'
-          : 'Покупка и скачивание временно недоступны. Мы готовим магазин к запуску.'}
-      </p>
+      <CommerceNotice action={wallpaper.isFree ? 'download' : 'product'} />
     </article>
   );
 }

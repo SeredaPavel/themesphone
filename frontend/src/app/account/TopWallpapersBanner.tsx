@@ -90,12 +90,12 @@ export default function TopWallpapersBanner() {
   return (
     <section className="form-panel relative flex flex-col gap-3">
       <div className="flex justify-between items-center mb-1">
-        <h2 className="text-lg font-bold">🔥 Топ за неделю</h2>
+        <h2 className="text-lg font-bold">Популярные обои</h2>
         <Link
-          href="/category/top"
+          href="/"
           className="text-sm px-3 py-1 rounded-full border border-[var(--foreground)] hover:bg-[var(--foreground)] hover:text-[var(--background)] transition"
         >
-          Смотреть все
+          В каталог
         </Link>
       </div>
 

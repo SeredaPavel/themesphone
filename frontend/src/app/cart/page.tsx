@@ -3,20 +3,13 @@
 import { useCart } from '@/context/CartContext';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
+import CommerceNotice, { commerceMessages } from '@/components/CommerceNotice';
 
 export default function CartPage() {
-  const { cartItems, removeFromCart, clearCart, addToCart } = useCart();
+  const { cartItems, removeFromCart, clearCart } = useCart();
   const router = useRouter();
 
   const total = cartItems.reduce((sum, item) => sum + item.price, 0);
-
-  // Добавим заглушку для тестового товара
-  const dummyItem = {
-    id: 99999,
-    title: 'Демо обои',
-    imageUrl: '/demo.jpg',
-    price: 100,
-  };
 
   const handleCheckout = async () => {
     const res = await fetch('/api/checkout/start', {
@@ -47,13 +40,6 @@ export default function CartPage() {
         <h1 className="text-3xl font-bold">Корзина</h1>
 
         <div className="flex gap-3">
-          <button
-            onClick={() => addToCart(dummyItem)}
-            className="text-sm px-3 py-1 rounded-full border border-[var(--foreground)] hover:bg-[var(--foreground)] hover:text-[var(--background)] transition"
-          >
-            Добавить
-          </button>
-
           {cartItems.length > 0 && (
             <button
               onClick={clearCart}
@@ -65,8 +51,10 @@ export default function CartPage() {
         </div>
       </div>
 
+      <div className="mb-6"><CommerceNotice id="cart-availability" action="checkout" /></div>
+
       {cartItems.length === 0 ? (
-        <p className="text-gray-500">Ваша корзина пуста.</p>
+        <p className="opacity-75">Ваша корзина пуста.</p>
       ) : (
         <>
           <ul className="divide-y divide-gray-200">
@@ -81,7 +69,7 @@ export default function CartPage() {
                 />
                 <div className="flex-1">
                   <p className="font-medium">{item.title}</p>
-                  <p className="text-sm text-gray-500">{item.price} ₽</p>
+                  <p className="text-sm opacity-80">{item.price} ₽</p>
                 </div>
                 <button
                   onClick={() => removeFromCart(item.id)}
@@ -97,7 +85,10 @@ export default function CartPage() {
             <p className="text-lg font-semibold mb-2">Итого: {total} ₽</p>
             <button
               onClick={handleCheckout}
-              className="inline-block px-4 py-2 rounded-full border border-[var(--foreground)] hover:bg-[var(--foreground)] hover:text-[var(--background)] transition"
+              disabled
+              aria-describedby="cart-availability"
+              title={commerceMessages.checkout}
+              className="liquid-pill"
             >
               Перейти к оплате
             </button>
