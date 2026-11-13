@@ -53,8 +53,9 @@ export async function oauthStart(req:Request,provider:string) {
   try {
     const text=await req.text();if(text.length>16384) throw Error('body');
     const form=new URLSearchParams(text);
-    const {data,ok}=await bridge(req,origin,'start',{provider,mode:form.get('mode')==='link'?'link':'login'});
-    if(!ok) return redirect('/auth/social?error='+encodeURIComponent(data.error || 'service_unavailable'),origin);
+    const mode=['link','merge-verify'].includes(form.get('mode') || '')?form.get('mode'):'login';
+    const {data,ok}=await bridge(req,origin,'start',{provider,mode,merge:cookie(req,'oauth_merge')});
+    if(!ok) return redirect((mode==='merge-verify'?'/auth/merge':'/auth/social')+'?error='+encodeURIComponent(data.error || 'service_unavailable'),origin);
     const url=new URL(data.url);
     const expected:Record<string,string>={google:'https://accounts.google.com',yandex:'https://oauth.yandex.ru',telegram:'https://oauth.telegram.org'};
     if(url.origin!==expected[provider] || !capability(data.browser)) throw Error('response');
@@ -67,14 +68,16 @@ export async function oauthCallback(req:Request,provider:string) {
   let origin;
   try {origin=publicOrigin(req);} catch {return json({error:'Некорректный адрес возврата'},400);}
   const clear=temporaryCookie('oauth_'+provider,'',origin,0);
-  const fail=(error:string)=>redirect('/auth/social?error='+encodeURIComponent(error),origin,[clear]);
+  const fail=(error:string)=>redirect((cookie(req,'oauth_merge')?'/auth/merge':'/auth/social')+'?error='+encodeURIComponent(error),origin,[clear]);
   if(url.searchParams.getAll('state').length!==1 || url.searchParams.getAll('code').length>1 || url.searchParams.getAll('error').length>1 || url.searchParams.has('access_token') || (url.searchParams.has('code') && url.searchParams.has('error'))) return fail('invalid_flow');
   const state=url.searchParams.get('state');const browser=cookie(req,'oauth_'+provider);
   if(!capability(state) || !capability(browser)) return fail('invalid_flow');
   try {
-    const {data,ok}=await bridge(req,origin,'finish',{provider,state,browser,code:url.searchParams.get('code'),error:url.searchParams.get('error')});
+    const {data,ok}=await bridge(req,origin,'finish',{provider,state,browser,merge:cookie(req,'oauth_merge'),code:url.searchParams.get('code'),error:url.searchParams.get('error')});
     if(!ok) return fail(data.error || 'service_unavailable');
-    if(typeof data.jwt==='string' && /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(data.jwt)) return redirect('/account'+(data.linked?'?connected='+provider:''),origin,[clear,temporaryCookie('oauth_pending','',origin,0),sessionCookie(data.jwt)]);
+    if(typeof data.jwt==='string' && /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(data.jwt)) return redirect('/account'+(data.linked?'?connected='+provider:data.created?'?welcome='+provider:''),origin,[clear,temporaryCookie('oauth_pending','',origin,0),temporaryCookie('oauth_merge','',origin,0),sessionCookie(data.jwt)]);
+    if(capability(data.mergePending)) return redirect('/auth/merge',origin,[clear,temporaryCookie('oauth_merge',data.mergePending,origin,600)]);
+    if(data.mergeVerified===true) return redirect('/auth/merge',origin,[clear]);
     if(capability(data.pending)) return redirect('/auth/social',origin,[clear,temporaryCookie('oauth_pending',data.pending,origin,900)]);
     throw Error('response');
   } catch {return fail('service_unavailable');}
@@ -97,15 +100,27 @@ export async function oauthAction(req:Request,action:'pending'|'register'|'conne
   try {
     const fields=req.method==='GET'?{}:await input(req);
     let serverAction:string=action;
+    if(action==='connections' && new URL(req.url).searchParams.get('view')==='merge') serverAction='mergePreview';
     if(action==='account') {
       if(fields.action==='add-email') serverAction='requestEmail';
       else if(fields.action==='create-password') serverAction='requestPassword';
+      else if(fields.action==='merge-accounts') serverAction='mergeConfirm';
+      else if(fields.action==='cancel-merge') serverAction='mergeCancel';
       else if(fields.action===undefined) serverAction='unlink';
       else return json({error:'Некорректное действие'},400);
     }
-    const {data,status,ok}=await bridge(req,origin,serverAction,{pending:cookie(req,'oauth_pending'),email:fields.email,provider:fields.provider});
-    if(!ok) return json({error:oauthMessages[data.error] || 'Сервис временно недоступен',code:data.error},status);
-    const response=json(data);
+    const {data,status,ok}=await bridge(req,origin,serverAction,{pending:cookie(req,'oauth_pending'),merge:cookie(req,'oauth_merge'),email:fields.email,provider:fields.provider,...(serverAction==='mergeConfirm'?{confirm:fields.confirm,password:fields.password}:{})});
+    if(!ok) {
+      const response=json({error:oauthMessages[data.error] || 'Сервис временно недоступен',code:data.error},status);
+      if(serverAction.startsWith('merge') && ['invalid_merge','merge_changed','login_required'].includes(data.error)) response.headers.append('Set-Cookie',temporaryCookie('oauth_merge','',origin,0));
+      return response;
+    }
+    const response=serverAction==='mergeConfirm'?json({merged:true}):json(data);
+    if(serverAction==='mergeConfirm') {
+      if(typeof data.jwt!=='string' || !/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(data.jwt)) return json({error:'Сервис временно недоступен'},503);
+      response.headers.append('Set-Cookie',sessionCookie(data.jwt));
+    }
+    if(serverAction==='mergeConfirm' || serverAction==='mergeCancel') response.headers.append('Set-Cookie',temporaryCookie('oauth_merge','',origin,0));
     if(action==='register') response.headers.append('Set-Cookie',temporaryCookie('oauth_pending','',origin,0));
     return response;
   } catch {return json({error:'Сервис временно недоступен'},503);}

@@ -74,9 +74,11 @@ async function main() {
     assert.equal(unlinks.filter(result=>result.status==='fulfilled').length,1);
     const remaining=await q(I).findOne({where:{user:user.id}});
     const role=await q('plugin::users-permissions.role').findOne({where:{type:'authenticated'}});
-    const other=await strapi.plugin('users-permissions').service('user').add({username:'other-'+tag,email:'other-'+tag+'@example.test',provider:'local',confirmed:true,blocked:false,role:role.id});
+    const other=await strapi.plugin('users-permissions').service('user').add({username:'other-'+tag,email:'other-'+tag+'@example.test',password:real.random(),provider:'local',confirmed:true,blocked:false,role:role.id});
     const otherToken=jwt.issue({id:other.id});subject=remaining.subject;
-    await assert.rejects(service.finish(await start(remaining.provider,{mode:'link',token:otherToken})),error=>error.code==='identity_in_use');
+    const proposal=await service.finish(await start(remaining.provider,{mode:'link',token:otherToken}));
+    assert.match(proposal.mergePending,/^[A-Za-z0-9_-]{43}$/);
+    await service.mergeCancel({origin,token:otherToken,merge:proposal.mergePending});
     phase='first password with pending email';
     const email='oauth-first-'+tag+'@example.test';
     assert.equal((await account(session,'create-password',email)).status,200);

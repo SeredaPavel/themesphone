@@ -87,6 +87,9 @@ export default function EmailAuthForm({ dialog = false, onBack, onNavigate, onAu
       <button key="login" type="button" className="auth-button auth-button--primary" onClick={() => { setRegistered(false); setRegistering(false); setMessage(''); }}>Перейти ко входу</button>
     </AuthStack> : <form onSubmit={submit} aria-label={title}>
       <AuthStack>
+        {registering && <div key="existing-oauth" className="auth-copy">Уже входили через Google, Яндекс или Telegram? Войдите через этот сервис и создайте пароль в кабинете.
+          {onBack?<button type="button" className="auth-link" onClick={onBack} disabled={busy}>Войти через сервис</button>:<Link href="/?auth=popup" className="auth-link">Войти через сервис</Link>}
+        </div>}
         <div key="email">
           <FormField label="Email" type="email" placeholder="name@example.com" value={email} onChange={event => setEmail(event.target.value)} autoComplete="email" required maxLength={254} disabled={busy} aria-invalid={emailError || undefined} aria-describedby={emailError ? id + '-email-error' : undefined} />
           {emailError && <p id={id + '-email-error'} className="auth-field-error">Некорректный email</p>}

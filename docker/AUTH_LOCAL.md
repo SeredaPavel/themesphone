@@ -92,6 +92,8 @@ npm run start -- --hostname 127.0.0.1 --port 3100
 node --experimental-strip-types scripts/check-local-auth.mjs
 node --experimental-strip-types scripts/check-local-auth.mjs --http
 node --experimental-strip-types scripts/check-account-recovery.mjs --http
+node scripts/check-local-oauth.cjs
+node scripts/check-account-merge.cjs
 node --experimental-strip-types --test frontend/tests/*.test.mjs
 ```
 
@@ -120,7 +122,12 @@ Email доступен только для чтения: его смена тр�
 ссылки, проверяет двух пользователей, подмену полей, конкурентный сброс и оба
 способа смены пароля. Пароли и токены в вывод не попадают.
 
-OAuth и подписка на рассылку — следующие задачи. Production SMTP и шаблоны
+OAuth и объединение профилей проверяются при запуске Strapi с `--oauth`:
+см. `../backend/OAUTH_SETTINGS.md`. Проверка объединения использует локальную
+PostgreSQL, подставные сервисы и Mailpit, отказывается работать с production
+и удаляет созданные ею записи. Реальный вход через сервисы проверяется отдельно
+на HTTPS; локальные тесты не доказывают корректность внешних OAuth-настроек.
+Подписка на рассылку остаётся отдельной задачей. Production SMTP и шаблоны
 настраиваются по `../backend/AUTH_SETTINGS.md` отдельно от локального окружения.
 Ограничения публичного Caddy этим изменением не снимаются. Перед публикацией
 потребуются отдельная проверка настроек production Strapi и разрешений маршрутов.

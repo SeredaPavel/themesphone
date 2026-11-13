@@ -7,14 +7,17 @@ import PasswordBlock from './PasswordBlock'
 import SubscribeBlock from './SubscribeBlock'
 import TopWallpapersBanner from './TopWallpapersBanner'
 import ConnectionsBlock from './ConnectionsBlock'
+import AccountWelcome from './AccountWelcome'
 
-export default async function AccountPage() {
+export default async function AccountPage({searchParams}: {searchParams:Promise<{welcome?:string;merged?:string}>}) {
   const user = await withAuthServer(async (user) => user, {
     popupRedirect: true,
   })
+  const params=await searchParams
 
   return (
     <div className="account-layout p-4 sm:p-6 lg:p-8 max-w-[1440px] mx-auto w-full grid gap-6 grid-cols-1 lg:grid-cols-[1fr_2fr] text-[var(--foreground)]">
+      <AccountWelcome provider={params.welcome} merged={params.merged==='1'} withoutEmail={!user.email} />
       {/* Левая колонка */}
       <div className="flex flex-col gap-6">
         <ProfileBlock user={user} />

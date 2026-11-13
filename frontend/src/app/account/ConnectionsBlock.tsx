@@ -32,7 +32,7 @@ export default function ConnectionsBlock({email}:{email:string|null}) {
   <PasswordBlock email={accountEmail} hasPassword={hasPassword} providers={connections.filter(item=>item.linked).map(item=>names[item.provider] || item.provider)} />
   <section className="form-panel flex flex-col gap-4">
     <h2>Способы входа</h2>
-    <p className="form-muted text-sm">Подключите сервис к этому аккаунту, чтобы входить без пароля.</p>
+    <p className="form-muted text-sm">Подключите сервис к этому аккаунту, чтобы входить без пароля. Если вы уже использовали его в другом профиле ThemesPhone, предложим объединение с подтверждением доступа к обоим профилям.</p>
     {connections.map(item=><div key={item.provider} className="flex items-center justify-between gap-3 flex-wrap">
       <span>{names[item.provider]}{item.linked?' · подключён':''}</span>
       {item.linked?<button type="button" className="liquid-pill" disabled={busy || (!hasPassword && connections.filter(item=>item.linked).length<=1)} onClick={()=>unlink(item.provider)}>Отключить</button>:<form method="post" action={'/api/connect/'+item.provider}><input type="hidden" name="mode" value="link"/><button disabled={busy || !item.enabled} className="liquid-pill" type="submit">Подключить</button></form>}

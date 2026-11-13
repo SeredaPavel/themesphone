@@ -71,6 +71,8 @@
     "phone": { "type": "string", "maxLength": 32 },
     "billingAddress": { "type": "string", "maxLength": 300 },
     "resetPasswordExpiresAt": { "type": "datetime", "private": true },
+    "mergedIntoUserId": { "type": "integer", "private": true },
+    "mergedAt": { "type": "datetime", "private": true },
     "orders": {
       "type": "relation",
       "relation": "oneToMany",

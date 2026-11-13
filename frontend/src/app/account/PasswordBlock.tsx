@@ -1,6 +1,7 @@
 'use client';
 import PasswordField from '@/components/PasswordField';
 import FormField from '@/components/FormField';
+import Link from 'next/link';
 import {useState} from 'react';
 import type {FormEvent} from 'react';
 import {useAuthContext} from '@/context/AuthContext';
@@ -17,6 +18,7 @@ export default function PasswordBlock({email,hasPassword=true,providers=[]}:Pass
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState('');
   const [message,setMessage]=useState('');
+  const [mergeSuggestion,setMergeSuggestion]=useState(false);
   const [contactEmail,setContactEmail]=useState(email || '');
   const [linkKind,setLinkKind]=useState<'email'|'password'>('password');
   async function createPassword(event:FormEvent<HTMLFormElement>) {
@@ -25,11 +27,11 @@ export default function PasswordBlock({email,hasPassword=true,providers=[]}:Pass
     const kind=(event.nativeEvent as SubmitEvent).submitter?.getAttribute('value')==='email'?'email':'password';
     const target=email || contactEmail.trim();
     setLinkKind(kind);
-    setBusy(true);setError('');setMessage('');
+    setBusy(true);setError('');setMessage('');setMergeSuggestion(false);
     try {
       const res=await fetch('/api/account/connections',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:kind==='email'?'add-email':'create-password',email:target})});
       const data=await res.json();
-      if(!res.ok) throw new Error(data.error || 'Не удалось отправить ссылку');
+      if(!res.ok) {setMergeSuggestion(data.code==='email_in_use');throw new Error(data.error || 'Не удалось отправить ссылку');}
       setMessage(kind==='email'?'Письмо отправлено на '+target+'. Подтвердите адрес по ссылке в письме.':'Письмо отправлено на '+target+'. По ссылке можно создать пароль для этого аккаунта.');
     } catch(error) {setError(error instanceof Error?error.message:'Нет соединения. Повторите позже');}
     finally {setBusy(false);}
@@ -54,6 +56,7 @@ export default function PasswordBlock({email,hasPassword=true,providers=[]}:Pass
     <p className="text-sm form-muted">{email?<>Создайте пароль, чтобы также входить по email. Отправим ссылку на {email}.</>:'Вы можете продолжать входить через сервис. Добавьте почту для писем или создайте пароль для входа по email.'}</p>
     {!email && <FormField label="Email" type="email" value={contactEmail} onChange={event=>setContactEmail(event.target.value)} autoComplete="email" placeholder="name@example.com" required maxLength={254} disabled={busy}/>}
     {error && <p role="alert" className="form-message form-message--error">{error}</p>}
+    {mergeSuggestion && <Link href="/auth/login" className="liquid-pill self-start">Войти по почте и объединить профили</Link>}
     {message && <p role="status" className="form-message">{message}</p>}
     <div className="flex flex-wrap gap-2">
       <button type="submit" value="password" disabled={busy} className="liquid-pill liquid-pill--accent">{busy && linkKind==='password'?'Отправка…':'Создать пароль'}</button>

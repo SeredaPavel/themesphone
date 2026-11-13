@@ -28,7 +28,8 @@ export default function SocialRegistration() {
     catch(error){setError(error instanceof Error?error.message:'Нет соединения');}finally{setBusy(false);}
   }
   const title=done?'Подтвердите почту':ready?'Продолжение входа':error?'Не удалось войти':'Продолжение входа';
-  const back=<Link key="back" href="/?auth=popup" className="auth-button">Вернуться ко входу</Link>;
+  const mergeError=!!code && code.startsWith('merge_');
+  const back=<Link key="back" href={mergeError?'/account':'/?auth=popup'} className="auth-button">{mergeError?'Вернуться в кабинет':'Вернуться ко входу'}</Link>;
   return <AuthPanel title={title}>
     {done ? <AuthStack>
       <AuthNotice key="success" kind="success">{message}</AuthNotice>
