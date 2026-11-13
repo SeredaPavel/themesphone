@@ -27,11 +27,11 @@ export default async function WallpaperCatalog({ searchParams, category, device 
   const returnTo = catalogPageHref(pathname, filters, filters.page);
 
   return (
-    <section className="p-6 text-[var(--foreground)]">
+    <section className="px-4 pb-6 sm:px-6 max-w-[1600px] mx-auto text-[var(--foreground)]">
       <CatalogScrollRestorer href={returnTo} />
       <h1 className="sr-only">{title}</h1>
       {data.length > 0 ? (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-6 gap-y-5" data-wallpaper-grid>
           {data.map(wallpaper => {
             const image = wallpaper.image?.find(item => !item.mime || item.mime.startsWith('image/'));
             const imageUrl = image ? getWallpaperImageUrl(image.formats?.medium?.url || image.formats?.small?.url || image.url) || '' : '';

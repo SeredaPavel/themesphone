@@ -1,180 +1,90 @@
-// 📄 src/components/WallpaperCard.tsx
 'use client';
 
 import Link from 'next/link';
-import { useCart } from '@/context/CartContext';
-import { useAuthContext } from '@/context/AuthContext';
-import { useId, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import {useEffect,useId,useState} from 'react';
+import type {MouseEvent} from 'react';
+import {useRouter} from 'next/navigation';
+import {ArrowUpRight,Check,Download,ShoppingBag,ShoppingCart} from 'lucide-react';
+import {useCart} from '@/context/CartContext';
+import {useAuthContext} from '@/context/AuthContext';
+import {wallpaperDetailHref} from '@/lib/catalog-query';
+import {rememberCatalogScroll} from '@/lib/catalog-scroll';
 import AuthModal from './AuthModal';
-import { wallpaperDetailHref } from '@/lib/catalog-query';
-import { rememberCatalogScroll } from '@/lib/catalog-scroll';
-import CommerceNotice, { commerceMessages } from './CommerceNotice';
+import PhoneFrame from './PhoneFrame';
+import type {PhoneDevice} from './PhoneFrame';
+import {commerceMessages} from './CommerceNotice';
+import styles from './WallpaperCard.module.css';
 
-type Props = {
-  id: number;
-  documentId?: string;
-  returnTo?: string;
-  title: string;
-  imageUrl: string;
-  isFree: boolean | null;
-  price?: number;
-  device?: { title: string; slug: string } | null;
-  category?: { title: string; slug: string } | null;
-  compact?: boolean;
-};
+type Props={id:number;documentId?:string;returnTo?:string;title:string;imageUrl:string;isFree:boolean|null;price?:number;device?:{title:string;slug:string}|null;category?:{title:string;slug:string}|null;compact?:boolean};
 
-export default function WallpaperCard({
-  id,
-  documentId,
-  returnTo,
-  title,
-  imageUrl,
-  isFree,
-  price,
-  device,
-  category,
-  compact = false,
-}: Props) {
-  const detailUrl = wallpaperDetailHref(documentId || String(id), returnTo);
-  const rememberPosition = () => { if (returnTo) rememberCatalogScroll(returnTo); };
-  const availabilityId = useId();
-  const { addToCart } = useCart();
-  const { user } = useAuthContext();
-  const [added, setAdded] = useState(false);
-  const [isAuthOpen, setIsAuthOpen] = useState(false);
-  const router = useRouter();
+export default function WallpaperCard({id,documentId,returnTo,title,imageUrl,isFree,price,device,category,compact=false}:Props) {
+  const [hovered,setHovered]=useState(false);
+  const [touchLayout,setTouchLayout]=useState(false);
+  const [keyboardFocus,setKeyboardFocus]=useState(false);
+  const [added,setAdded]=useState(false);
+  const [isAuthOpen,setIsAuthOpen]=useState(false);
+  const expanded=touchLayout || hovered || keyboardFocus;
+  const detailsId=useId(),availabilityId=useId();
+  const detailUrl=wallpaperDetailHref(documentId || String(id),returnTo);
+  const rememberPosition=()=>{if(returnTo)rememberCatalogScroll(returnTo);};
+  const slug=device?.slug?.toLowerCase();
+  const frame:PhoneDevice=slug==='android'?'android':slug==='iphone'?'iphone':'generic';
+  const {addToCart}=useCart();
+  const {user}=useAuthContext();
+  const router=useRouter();
 
-  const handleAddToCart = () => {
-    if (!user) {
-      setIsAuthOpen(true);
-      return;
-    }
-    if (!price) return;
-    addToCart({ id, title, imageUrl, price });
-    setAdded(true);
-    setTimeout(() => setAdded(false), 2000);
-  };
+  useEffect(()=>{
+    const media=window.matchMedia('(hover: none)');
+    const update=()=>setTouchLayout(media.matches);
+    update();media.addEventListener('change',update);
+    return()=>media.removeEventListener('change',update);
+  },[]);
+  useEffect(()=>{if(!added)return;const timer=setTimeout(()=>setAdded(false),2000);return()=>clearTimeout(timer);},[added]);
 
-  const handleBuyNow = async () => {
-    if (!price) return;
+  function openProduct(event:MouseEvent<HTMLElement>) {
+    if(event.defaultPrevented || event.button!==0 || !(event.target instanceof Element) || event.target.closest('a,button,input,select,textarea,label,[role="button"]'))return;
+    rememberPosition();
+    if(event.ctrlKey || event.metaKey){window.open(detailUrl,'_blank','noopener,noreferrer');return;}
+    router.push(detailUrl);
+  }
 
-    const body: any = {
-      data: {
-        wallpapers: { connect: [id] },
-        amount: price,
-        paid: false,
-      },
-    };
-
-    if (user?.id) {
-      body.data.users_permission = user.id;
-    }
-
+  function add() {
+    if(!user){setIsAuthOpen(true);return;}
+    if(!price)return;
+    addToCart({id,title,imageUrl,price});setAdded(true);
+  }
+  // Kept for the payment stage; the visible purchase button remains disabled.
+  async function buy() {
+    if(!price)return;
     try {
-      const res = await fetch('/api/checkout/start', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
+      const res=await fetch('/api/checkout/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({data:{wallpapers:{connect:[id]},amount:price,paid:false,...(user?.id?{users_permission:user.id}:{})}})});
+      const json=await res.json();
+      if(json?.data?.id)router.push(`/checkout/${json.data.id}?from=${encodeURIComponent(window.location.pathname)}`);
+    } catch { /* Purchase stays disabled until the server order/payment flow is ready. */ }
+  }
 
-      const json = await res.json();
-      const orderId = json?.data?.id;
-
-      if (orderId) {
-        router.push(`/checkout/${orderId}?from=${encodeURIComponent(window.location.pathname)}`);
-      } else {
-        alert('Ошибка при создании заказа');
-      }
-    } catch (err) {
-      console.error('Ошибка при заказе:', err);
-      alert('Ошибка сервера');
-    }
-  };
-
-  return (
-    <>
-      <div
-        className={`wallpaper-card text-[var(--foreground)] transition hover:shadow-xl flex flex-col ${
-          compact ? 'shadow-sm w-[120px]' : 'shadow-md'
-        } rounded-2xl overflow-hidden`}
-      >
-        <Link href={detailUrl} onClick={rememberPosition}>
-          <div className={`${compact ? 'aspect-[9/16] h-[180px]' : 'aspect-[9/16]'} overflow-hidden cursor-pointer`}>
-            {imageUrl ? <img
-              src={imageUrl}
-              alt={title}
-              className="w-full h-full object-cover transition-transform duration-300 hover:scale-105 rounded-2xl"
-            /> : <div className="h-full flex items-center justify-center p-3 text-center text-sm">Изображение пока не добавлено</div>}
+  return <>
+    <article className={`${styles.card}${compact?' '+styles.compact:''}`} aria-label={title} data-wallpaper-card data-compact={compact} onClick={openProduct}
+      onPointerEnter={event=>{if(event.pointerType==='mouse')setHovered(true);}} onPointerLeave={()=>setHovered(false)}
+      onFocusCapture={event=>{if(event.target.matches(':focus-visible'))setKeyboardFocus(true);}}
+      onBlurCapture={event=>{if(!event.currentTarget.contains(event.relatedTarget))setKeyboardFocus(false);}}
+      onKeyDown={event=>{if(event.key==='Escape'){setHovered(false);setKeyboardFocus(false);if(document.activeElement instanceof HTMLElement)document.activeElement.blur();}}}>
+      <PhoneFrame title={title} imageUrl={imageUrl} device={frame} expanded={expanded} detailsId={compact?undefined:detailsId}
+        imageHref={detailUrl} onNavigate={rememberPosition}>
+        {!compact && <>
+          <div className={styles.heading}><h2><Link href={detailUrl} onClick={rememberPosition} tabIndex={expanded?0:-1} title={title} aria-label={`Открыть обои «${title}»`}><span>{title}</span><ArrowUpRight size={12} /></Link></h2><span className={styles.price}>{isFree?'Бесплатно':`${price ?? '—'} ₽`}</span></div>
+          <div className={styles.tags}>{category && <span title={category.title}>{category.title}</span>}{device && <span>{frame==='iphone'?'iPhone':device.title}</span>}</div>
+          <div className={styles.actions}>
+            {isFree?<button type="button" disabled title={commerceMessages.download} aria-describedby={availabilityId}><Download size={13} />Загрузить <small>скоро</small></button>:<>
+              <button type="button" onClick={buy} disabled title={commerceMessages.purchase} aria-describedby={availabilityId} className={styles.buy}><ShoppingBag size={13} />Купить <small>скоро</small></button>
+              <button type="button" onClick={add} tabIndex={expanded?0:-1} aria-label={added?`Добавлено: ${title}`:`В корзину: ${title}`} className={added?styles.added:''}>{added?<Check size={13} />:<ShoppingCart size={13} />}{added?'Добавлено':'В корзину'}</button>
+            </>}
           </div>
-        </Link>
-
-        <div className={`flex flex-col gap-2 ${compact ? 'px-2 py-3' : 'p-4'} flex-1`}>
-          <h2 className={`${compact ? 'text-sm' : 'text-lg'} font-semibold break-words whitespace-normal leading-snug`}>
-            <Link href={detailUrl} onClick={rememberPosition}>{title}</Link>
-          </h2>
-
-          {!compact && (
-            <>
-              <div className="flex flex-wrap gap-2 text-xs text-[var(--foreground)]/70">
-                {category && (
-                  <span className="wallpaper-tag px-2 py-0.5 rounded-full">
-                    {category.title}
-                  </span>
-                )}
-                {device && (
-                  <span className="wallpaper-tag px-2 py-0.5 rounded-full">
-                    {device.title}
-                  </span>
-                )}
-              </div>
-
-              <p className="text-sm font-medium mt-1">
-                {isFree ? 'Бесплатно' : `${price ?? '—'} ₽`}
-              </p>
-
-              <div className="mt-2 flex flex-wrap gap-2">
-                {isFree ? (
-                  <button
-                    type="button"
-                    disabled
-                    aria-describedby={availabilityId}
-                    title={commerceMessages.download}
-                    className="liquid-pill !px-3 !py-1.5"
-                  >
-                    Загрузить
-                  </button>
-                ) : (
-                  <>
-                    <button
-                      onClick={handleBuyNow}
-                      disabled
-                      aria-describedby={availabilityId}
-                      title={commerceMessages.purchase}
-                      className="liquid-pill !px-3 !py-1.5"
-                    >
-                      Купить сейчас
-                    </button>
-                    <button
-                      onClick={handleAddToCart}
-                      className={`liquid-pill !px-3 !py-1.5 ${
-                        added
-                          ? '!bg-[#b6edf533] !text-[#b6f8fb]'
-                          : ''
-                      }`}
-                    >
-                      {added ? '✓ Добавлено' : 'В корзину'}
-                    </button>
-                  </>
-                )}
-              </div>
-              <CommerceNotice id={availabilityId} action={isFree ? 'download' : 'purchase'} compact />
-            </>
-          )}
-        </div>
-      </div>
-
-      <AuthModal isOpen={isAuthOpen} onClose={() => setIsAuthOpen(false)} />
-    </>
-  );
+          <span className="sr-only" id={availabilityId}>{commerceMessages[isFree?'download':'purchase']}</span>
+        </>}
+      </PhoneFrame>
+      {compact && <h3 className={styles.compactTitle}><Link href={detailUrl} onClick={rememberPosition}>{title}</Link></h3>}
+    </article>
+    <AuthModal isOpen={isAuthOpen} onClose={()=>setIsAuthOpen(false)} />
+  </>;
 }

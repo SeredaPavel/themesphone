@@ -57,9 +57,9 @@ export default function CatalogFilterPanel({ initial, categories, devices, loadi
         <input type="search" maxLength={100} value={draft.q} onChange={event => setDraft({ ...draft, q: event.target.value })}
           placeholder="Поиск по названию" className={`${fieldClass(!!draft.q.trim())} filter-search`} />
       </label>
-    <div className="flex flex-wrap gap-2 mt-3">
-      <button type="submit" disabled={loading || error} className="liquid-pill liquid-pill--accent !px-3 whitespace-nowrap">Применить</button>
-      <button type="button" onClick={onReset} className="liquid-pill !px-3 whitespace-nowrap">Сбросить фильтр</button>
+    <div className="catalog-filter-actions">
+      <button type="submit" disabled={loading || error} className="liquid-pill liquid-pill--accent">Применить</button>
+      <button type="button" onClick={onReset} className="liquid-pill">Сбросить фильтр</button>
     </div>
   </form>;
 }

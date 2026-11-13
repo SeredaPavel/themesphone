@@ -1,0 +1,46 @@
+.scene { width:100%; min-width:0; aspect-ratio:9/19.5; display:grid; place-items:center; perspective:1150px; position:relative; isolation:isolate; container-type:inline-size; }
+.scene::after { content:''; position:absolute; bottom:1%; left:13%; right:9%; height:4%; background:#001e2b4d; border-radius:50%; filter:blur(17px); transform:scaleX(.85); transition:transform .8s ease,opacity .8s; z-index:-1; pointer-events:none; }
+.phone { position:relative; width:88%; aspect-ratio:9/19.5; border-radius:17.4% / 8%; transform-style:preserve-3d; transform:rotateX(4deg) rotateY(25deg) rotateZ(-4deg); transition:transform .85s cubic-bezier(.2,.75,.2,1),width .85s cubic-bezier(.2,.75,.2,1); }
+.back { position:absolute; inset:0; border-radius:inherit; transform:translateZ(-10px) translateX(5px); background:linear-gradient(260deg,#75605d,#d9bab0 11%,#453d43 24%,#a9948a 95%); border:1px solid #dec7c37d; box-shadow:2px 0 0 #362e37,5px 2px 0 #7b6666,7px 3px 0 #342d35; transition:transform .85s cubic-bezier(.2,.75,.2,1),box-shadow .85s ease; }
+.shell { position:absolute; inset:0; padding:clamp(3px,1.9cqi,6px); border-radius:inherit; background:linear-gradient(120deg,#e2cbc0,#796967 18%,#2c292f 43%,#9c918b 72%,#514a4e); border:1px solid #dfc7bd8c; box-shadow:inset 0 0 0 2px #e6dad245,1px 2px 1px #0e171cd9,16px 22px 55px #001f2e4a; }
+.shell::after { content:''; position:absolute; inset:1px; border:1px solid #f5e4d13b; border-radius:inherit; pointer-events:none; }
+.screen { width:100%; height:100%; position:relative; isolation:isolate; border-radius:15.5% / 7.2%; background:#08121a; border:clamp(1px,.9cqi,3px) solid #0a0c12; overflow:hidden; }
+.wallpaperToggle { position:absolute; inset:0; display:block; width:100%; height:100%; padding:0; border:0; background:transparent; border-radius:inherit; cursor:zoom-in; overflow:hidden; touch-action:pan-y; }
+.wallpaperToggle:focus-visible { outline:2px solid #d9fff5; outline-offset:-3px; }
+.wallpaper { width:100%; height:100%; object-fit:cover; transform:scale(1); transition:transform 1.1s cubic-bezier(.2,.75,.2,1); }
+.imageFallback { display:grid; height:100%; place-items:center; padding:18px; color:#b4d8d8; font-size:clamp(9px,4cqi,14px); }
+.screenLight { position:absolute; inset:0; background:linear-gradient(110deg,#ffffff18,transparent 40%,#001b330c); pointer-events:none; transition:opacity .85s; }
+.statusBar { position:absolute; top:2.8%; left:7.7%; right:7%; display:flex; align-items:center; justify-content:space-between; z-index:3; pointer-events:none; color:#fff; font-size:clamp(5px,2.8cqi,9px); font-weight:500; text-shadow:0 1px 4px #00182980; }
+.statusBar svg { width:15%; height:auto; }
+.island { position:absolute; top:1.9%; left:50%; transform:translateX(-50%); width:28%; height:3.8%; border-radius:999px; background:#070a0f; box-shadow:inset 0 1px 1px #332b34; z-index:4; pointer-events:none; }
+.island i { position:absolute; right:15%; top:36%; width:8.2%; aspect-ratio:1; border-radius:50%; background:radial-gradient(circle at 40% 40%,#1a3553,#090f19 65%); box-shadow:0 0 0 1px #0c111a; }
+.camera { position:absolute; top:2.8%; left:50%; transform:translateX(-50%); width:4%; aspect-ratio:1; border-radius:50%; background:radial-gradient(circle at 40% 40%,#1a3553,#05070b 64%); border:2px solid #080c12; z-index:4; pointer-events:none; }
+.sideButton { position:absolute; left:-2%; width:1%; border:1px solid #b8a49b59; border-radius:3px; background:linear-gradient(90deg,#736265,#d2b6a3); transform:translateZ(-5px); pointer-events:none; }
+.actionButton { top:14%; height:3.5%; }
+.volumeUp { top:22%; height:6%; }
+.volumeDown { top:30%; height:6%; }
+.powerButton { left:auto; right:-.8%; top:26%; height:9%; }
+.details { position:absolute; inset:auto 0 0; height:22%; padding:clamp(9px,4cqi,13px) clamp(9px,4.4cqi,14px) clamp(17px,7.2cqi,23px); z-index:5; display:flex; flex-direction:column; justify-content:center; gap:clamp(5px,2.2cqi,7px); color:#f3fcf9; border-top:1px solid #ccece45c; background:linear-gradient(135deg,#164a50fa,#103b43fa 65%,#214d54fa); transform:translateY(102%); opacity:0; pointer-events:none; transition:transform .65s cubic-bezier(.18,.8,.2,1),opacity .35s ease; }
+.homeIndicator { position:absolute; bottom:1.2%; left:50%; transform:translateX(-50%); height:clamp(1px,.9cqi,3px); width:28%; border-radius:9px; background:#f5fff5c4; z-index:6; pointer-events:none; }
+/* Grow the frame with layout width so the final text is painted at native size. */
+.scene[data-expanded="true"] .phone { width:92.84%; transform:none; }
+.scene[data-expanded="true"] .back { transform:translateZ(-10px); box-shadow:none; }
+.scene[data-expanded="true"] .wallpaper { transform:scale(1.16); }
+.scene[data-expanded="true"] .wallpaperToggle { cursor:zoom-out; }
+.scene[data-expanded="true"] .screenLight { opacity:.25; }
+.scene[data-expanded="true"] .details { transform:none; opacity:1; pointer-events:auto; transition-delay:.18s; }
+.scene .wallpaperToggle[href] { cursor:pointer; }
+.scene[data-expanded="true"]::after { transform:scaleX(1.12); opacity:.8; }
+.scene[data-phone-frame="android"] .phone { border-radius:9.5% / 4.4%; }
+.scene[data-phone-frame="android"] .screen { border-radius:7.5% / 3.5%; }
+.scene[data-phone-frame="android"] .shell { background:linear-gradient(120deg,#c6cfd3,#737c83 18%,#30363e 43%,#aab3bb 72%,#5c6770); border-color:#d6e2ea8c; }
+.scene[data-phone-frame="android"] .back { background:linear-gradient(260deg,#697780,#c3cfd7 11%,#353f49 24%,#9aa7b2 95%); box-shadow:2px 0 0 #2c3742,5px 2px 0 #6c7b86,7px 3px 0 #2b3741; }
+.scene[data-phone-frame="android"][data-expanded="true"] .back { box-shadow:none; }
+.scene[data-phone-frame="android"] .sideButton { left:auto; right:-1%; background:linear-gradient(90deg,#556570,#c3d2dc); }
+.scene[data-phone-frame="android"] .volumeUp { top:21%; height:10%; }
+.scene[data-phone-frame="android"] .volumeDown { display:none; }
+.scene[data-phone-frame="android"] .powerButton { top:34%; height:7%; }
+@media (prefers-reduced-motion:reduce) {
+  .phone,.back,.wallpaper,.details,.screenLight,.scene::after { transition:none; }
+  .scene[data-expanded="true"] .details { transition-delay:0s; }
+}

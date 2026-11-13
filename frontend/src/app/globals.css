@@ -64,6 +64,8 @@ h1:not(.sr-only) { font-size: clamp(2.7rem, 5vw, 4.6rem); }
 .filter-choice.is-selected { background:#b6edf526; color:#b6f8fb; }
 .filter-choice input { accent-color: #7edee1; }
 .catalog-filter { animation:menu-reveal .28s ease both; }
+.catalog-filter-actions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; margin-top:12px; }
+.catalog-filter-actions > .liquid-pill { min-width:0; min-height:42px; padding:10px 8px; font-size:13px; line-height:20px; white-space:nowrap; }
 .catalog-filter .filter-field, .catalog-filter button:not(.liquid-pill--accent) { background:#285e65e8; }
 .catalog-filter .filter-field:hover, .catalog-filter button:not(.liquid-pill--accent):hover { background:#467d83f2; }
 .catalog-filter .filter-field.is-selected { background:#285e65f2; }
@@ -83,8 +85,6 @@ h1:not(.sr-only) { font-size: clamp(2.7rem, 5vw, 4.6rem); }
   .soft-disclosure::details-content { block-size:0; opacity:0; overflow:clip; transition:block-size .3s ease, opacity .25s ease, content-visibility .3s allow-discrete; }
   .soft-disclosure[open]::details-content { block-size:auto; opacity:1; }
 }
-.wallpaper-card { background:#06363bd9; box-shadow:0 8px 30px #00262e16; border:1px solid #dfffff14; }
-.wallpaper-card h2 { font-weight:500; }
 .wallpaper-tag { background:#d6f5f51c; color:#d9eeee; }
 .taxonomy-card { display:block; height:100%; border-radius:28px; padding:26px; background:#effbfbdf; color:var(--ink); border:1px solid #ffffff8c; box-shadow:inset 0 1px 1px #fff, 0 12px 30px #00363b0c; transition:background .3s, transform .3s; }
 .taxonomy-card:hover { background:#fff; transform:translateY(-3px); }
