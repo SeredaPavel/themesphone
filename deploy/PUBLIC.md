@@ -35,7 +35,7 @@
 | Четыре имени сайта: страницы и Next images | Доступны, интерфейс прежний | Обычная проверка изменений |
 | Сайт: GET/HEAD `/api/top-wallpapers` | Разрешены | Только публичные данные |
 | Сайт: остальные `/api` и `/api/*` | HTTP 410, JSON о временной недоступности | Открывать конкретные маршруты после проверки |
-| Сайт: `/api/download` | HTTP 410 | Убрать произвольный URL; проверять источник/ID файла, размер, права и покупку; закрыть SSRF |
+| Сайт: GET/HEAD `/api/download?file=ID` | Next.js проверяет товар; бесплатный оригинал — S3 redirect, платный — 403 | Разрешён только ID; старые `url`/`name` и неверный ID — 400 на Caddy; CMS file route снаружи закрыт |
 | Сайт: `/api/checkout/start`, `/api/checkout/pay` | HTTP 410 | Серверные цены, владелец заказа, настоящий платёжный провайдер, подпись webhook и повторные уведомления |
 | Сайт: POST `/api/register`, `/api/login`, `/api/auth/email-confirmation`, `/api/auth/resend-confirmation`, `/api/auth/forgot-password`, `/api/auth/reset-password`, `/api/auth/change-password`, `/api/auth/logout` | Разрешены после установки текущего Caddyfile | Email auth через BFF, Origin-проверка, HttpOnly cookie, штатная проверка Strapi |
 | Сайт: GET `/api/me`, PUT `/api/account/profile` | Разрешены после установки текущего Caddyfile | Только собственный пользователь; белый список полей |
@@ -44,6 +44,7 @@
 | Сайт: старый `/api/set-token`, `/api/auth/set-token` и Apple OAuth | HTTP 410 | Старый приём произвольного токена отключён; Apple остаётся отдельной задачей |
 | CMS: GET/HEAD wallpapers/categories/devices и отдельных записей | Проксируются с обычными правами Strapi | Проверить публичные поля и populate; не раскрывать приватные связи |
 | CMS: остальные `/api`, включая users/orders/auth и запись в коллекции | HTTP 410 | Роли, владельцы, права, валидация; разрешать адресно |
+| CMS: `/wallpaper-originals` и POST `/wallpaper-originals/:documentId` | Штатная admin-аутентификация Strapi и отдельное право `wallpaper-originals.manage` | Загрузка из админки; ограничение тела 52 MB и файла 50 МиБ; публичных write-разрешений нет |
 | CMS: `/documentation` | HTTP 404 | Открывать только при необходимости и с подходящим доступом |
 | CMS: админка и служебные маршруты | Проксируются, штатная авторизация Strapi | Панель публично достижима; надёжный пароль администратора, не расширять публичные права |
 | CMS: `/uploads/*` | Доступны напрямую | Запрет API скачивания не защищает платные изображения |

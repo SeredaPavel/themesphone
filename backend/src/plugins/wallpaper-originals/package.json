@@ -1,0 +1,7 @@
+{
+  "name": "themesphone-wallpaper-originals",
+  "version": "1.0.0",
+  "private": true,
+  "main": "strapi-server.js",
+  "strapi": { "name": "wallpaper-originals", "displayName": "Оригиналы обоев", "kind": "plugin" }
+}

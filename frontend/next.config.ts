@@ -9,6 +9,8 @@ const nextConfig: NextConfig = {
       hostname: imageOrigin.hostname,
       port: imageOrigin.port,
       pathname: "/uploads/**",
+    }, {
+      protocol: 'https', hostname: 'storage.yandexcloud.net', pathname: '/*/previews/**', search: '',
     }],
   },
 };

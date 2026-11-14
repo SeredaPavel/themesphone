@@ -4,6 +4,8 @@ import { notFound, permanentRedirect } from 'next/navigation';
 import { getDescriptionParagraphs, getWallpaper, getWallpaperImageUrl } from '@/lib/wallpaper.server';
 import { safeCatalogReturn, wallpaperDetailHref } from '@/lib/catalog-query';
 import CommerceNotice from '@/components/CommerceNotice';
+import DownloadLink from '@/components/DownloadLink';
+import { validOriginal, originalDescription } from '@/lib/download-links';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,6 +25,8 @@ export default async function WallpaperDetailPage({ params, searchParams }: {
     return url ? [{ ...image, url }] : [];
   });
   const paragraphs = getDescriptionParagraphs(wallpaper.description);
+  const original = validOriginal(wallpaper.originalFile) ? wallpaper.originalFile : null;
+  const specs = original ? originalDescription(original) : null;
 
   return (
     <article className="product-detail p-6 max-w-4xl mx-auto">
@@ -66,10 +70,17 @@ export default async function WallpaperDetailPage({ params, searchParams }: {
           <dd>{wallpaper.isFree ? 'Бесплатно' : `${wallpaper.price ?? '—'} ₽`}</dd>
         </div>
       </dl>
+      {specs && <dl className="mb-6 flex flex-wrap gap-x-8 gap-y-3">
+        <div><dt className="text-sm opacity-70">Формат оригинала</dt><dd>{specs.format}</dd></div>
+        <div><dt className="text-sm opacity-70">Разрешение</dt><dd>{specs.resolution}</dd></div>
+        <div><dt className="text-sm opacity-70">Размер файла</dt><dd>{specs.size}</dd></div>
+      </dl>}
       <div className="space-y-3 mb-6 whitespace-pre-wrap">
         {paragraphs.length ? paragraphs.map((paragraph, index) => <p key={index}>{paragraph}</p>) : <p>Описание пока не добавлено.</p>}
       </div>
-      <CommerceNotice action={wallpaper.isFree ? 'download' : 'product'} />
+      {wallpaper.isFree === true && original
+        ? <DownloadLink file={original} wallpaper={wallpaper.documentId} returnTo={returnTo} className="liquid-pill" />
+        : <CommerceNotice action={wallpaper.isFree ? 'download' : 'product'} />}
     </article>
   );
 }

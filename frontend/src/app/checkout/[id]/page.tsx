@@ -68,14 +68,8 @@ function LegacyCheckoutContent() {
   };
 
   const handleDownload = () => {
-    if (!order?.attributes?.wallpapers?.data?.[0]) return;
-
-    const imageUrl = order.attributes.wallpapers.data[0].attributes.imageUrl;
-    const title = order.attributes.wallpapers.data[0].attributes.title;
-
-    const url = `/api/download?url=${encodeURIComponent(imageUrl)}&name=${encodeURIComponent(title)}.jpg`;
-    window.location.href = url;
-
+    // Paid download IDs will come from the verified order entitlement endpoint.
+    // Never use a preview URL as an original or grant access from client state.
     setShowDownloadPopup(false);
   };
 

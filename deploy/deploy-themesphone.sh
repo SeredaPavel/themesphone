@@ -62,7 +62,8 @@ verify_routes() {
     if [[ "$access_mode" == public ]]; then
         for host in themesphone.ru www.themesphone.ru themesphone.com www.themesphone.com; do
             http_status 200 "$host" / public || return 1
-            http_status 410 "$host" /api/download public || return 1
+            http_status 400 "$host" /api/download public || return 1
+            http_status 400 "$host" '/api/download?file=invalid&url=http://127.0.0.1' public || return 1
         done
         http_status 200 cms.themesphone.ru /admin public || return 1
         http_status 204 cms.themesphone.ru /_health public || return 1

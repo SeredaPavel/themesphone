@@ -11,14 +11,17 @@ import {wallpaperDetailHref} from '@/lib/catalog-query';
 import {rememberCatalogScroll} from '@/lib/catalog-scroll';
 import AuthModal from './AuthModal';
 import PhoneFrame from './PhoneFrame';
+import DownloadLink from './DownloadLink';
+import {validOriginal} from '@/lib/download-links';
+import type {OriginalFile} from '@/lib/download-links';
 import {useWallpaperPreview} from './WallpaperPreviewGroup';
 import type {PhoneDevice} from './PhoneFrame';
 import {commerceMessages} from './CommerceNotice';
 import styles from './WallpaperCard.module.css';
 
-type Props={id:number;documentId?:string;returnTo?:string;title:string;imageUrl:string;isFree:boolean|null;price?:number;device?:{title:string;slug:string}|null;category?:{title:string;slug:string}|null;compact?:boolean};
+type Props={id:number;documentId?:string;returnTo?:string;title:string;imageUrl:string;isFree:boolean|null;price?:number;device?:{title:string;slug:string}|null;category?:{title:string;slug:string}|null;compact?:boolean;originalFile?:OriginalFile|null};
 
-export default function WallpaperCard({id,documentId,returnTo,title,imageUrl,isFree,price,device,category,compact=false}:Props) {
+export default function WallpaperCard({id,documentId,returnTo,title,imageUrl,isFree,price,device,category,compact=false,originalFile}:Props) {
   const [hovered,setHovered]=useState(false);
   const [keyboardFocus,setKeyboardFocus]=useState(false);
   const [added,setAdded]=useState(false);
@@ -71,7 +74,9 @@ export default function WallpaperCard({id,documentId,returnTo,title,imageUrl,isF
           <div className={styles.heading}><h2><Link href={detailUrl} onClick={rememberPosition} tabIndex={expanded?0:-1} title={title} aria-label={`Открыть обои «${title}»`}><span>{title}</span><ArrowUpRight size={12} /></Link></h2><span className={styles.price}>{isFree?'Бесплатно':`${price ?? '—'} ₽`}</span></div>
           <div className={styles.tags}>{category && <span title={category.title}>{category.title}</span>}{device && <span>{frame==='iphone'?'iPhone':device.title}</span>}</div>
           <div className={styles.actions}>
-            {isFree?<button type="button" disabled title={commerceMessages.download} aria-describedby={availabilityId}><Download size={13} />Загрузить <small>скоро</small></button>:<>
+            {isFree===true?(validOriginal(originalFile) && documentId
+              ?<DownloadLink file={originalFile} wallpaper={documentId} returnTo={returnTo} tabIndex={expanded?0:-1} />
+              :<button type="button" disabled title={commerceMessages.download} aria-describedby={availabilityId}><Download size={13} />Загрузить <small>скоро</small></button>):<>
               <button type="button" onClick={buy} disabled title={commerceMessages.purchase} aria-describedby={availabilityId} className={styles.buy}><ShoppingBag size={13} />Купить <small>скоро</small></button>
               <button type="button" onClick={add} tabIndex={expanded?0:-1} aria-label={added?`Добавлено: ${title}`:`В корзину: ${title}`} className={added?styles.added:''}>{added?<Check size={13} />:<ShoppingCart size={13} />}{added?'Добавлено':'В корзину'}</button>
             </>}

@@ -18,3 +18,4 @@ structure.txt
 public/uploads/*
 !public/uploads/.gitkeep
 exports
+.private

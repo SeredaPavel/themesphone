@@ -72,7 +72,11 @@ with tempfile.TemporaryDirectory() as folder:
             cases += [(front,path,'POST',410) for path in oauth_reads if path!='/api/account/connections']
             cases += [(front, path, 'GET', 410) for path in auth_paths]
             cases += [(front, '/api/me', 'POST', 410), (front, '/api/account/profile', 'POST', 410)]
-            cases += [(front, path, method, 410) for path in ['/api/download?url=http://127.0.0.1', '/api/checkout/pay', '/api/set-token', '/api/auth/set-token', '/api/connect/apple', '/api/oauth/bridge', '/api', '/API/download', '//api/download', '/%61pi/download', '/api%2Fdownload'] for method in ['GET', 'POST']]
+            cases += [(front, path, method, 410) for path in ['/api/checkout/pay', '/api/set-token', '/api/auth/set-token', '/api/connect/apple', '/api/oauth/bridge', '/api', '/API/download', '//api/download', '/%61pi/download', '/api%2Fdownload'] for method in ['GET', 'POST']]
+            cases += [(front, path, method, 400) for path in ['/api/download', '/api/download?url=http://127.0.0.1', '/api/download?file=abc&url=http://127.0.0.1', '/api/download?file=abc&%75rl=http://127.0.0.1', '/api/download?file=../admin', '/api/download?file=abc&name=file'] for method in ['GET', 'HEAD']]
+            cases += [(front, '/api/download?file=abc', method, 200) for method in ['GET', 'HEAD']]
+            cases += [(front, '/api/download?file=abc', 'POST', 410)]
+            cases += [(cms, '/wallpaper-originals', 'GET', 200), (cms, '/wallpaper-originals/abc', 'POST', 200), (cms, '/api/wallpaper-files/abc/download', 'GET', 410)]
             cases += [(cms, path, method, 410) for path in ['/api/users', '/api/orders', '/api/auth/local', '/api/oauth/bridge', '/api/oauth-flows', '/api/oauth-identities', '/API/users', '//api/users', '/%61pi/users', '/api%2Fusers'] for method in ['GET', 'POST']]
             cases += [(cms, '/api/wallpapers', 'POST', 410), (front, '/api/top-wallpapers', 'POST', 410), (cms, '/documentation', 'GET', 404), (cms, '/documentation/v1', 'GET', 404)]
             for target, path, method, expected in cases:

@@ -8,10 +8,11 @@ const wallpaper = {
 };
 const oldServerOrigin = process.env.STRAPI_API_URL;
 const oldPublicOrigin = process.env.NEXT_PUBLIC_STRAPI_URL;
+const oldBucket = process.env.S3_PREVIEWS_BUCKET;
 
 afterEach(() => {
   mock.restoreAll();
-  for (const [key, value] of [['STRAPI_API_URL', oldServerOrigin], ['NEXT_PUBLIC_STRAPI_URL', oldPublicOrigin]]) {
+  for (const [key, value] of [['STRAPI_API_URL', oldServerOrigin], ['NEXT_PUBLIC_STRAPI_URL', oldPublicOrigin], ['S3_PREVIEWS_BUCKET', oldBucket]]) {
     if (value === undefined) delete process.env[key];
     else process.env[key] = value;
   }
@@ -93,4 +94,12 @@ test('renders nested Strapi description text without interpreting HTML', () => {
   ]), ['Обои для телефона', '<script>literal text</script>']);
   assert.deepEqual(getDescriptionParagraphs(null), []);
   assert.deepEqual(getDescriptionParagraphs('Описание'), ['Описание']);
+});
+
+test('cloud images accept only unsigned previews from the configured public bucket', () => {
+  process.env.S3_PREVIEWS_BUCKET = 'themesphone-test-previews';
+  const url = 'https://storage.yandexcloud.net/themesphone-test-previews/previews/test.jpg';
+  assert.equal(getWallpaperImageUrl(url), url);
+  for (const invalid of [url.replace('themesphone-test-previews', 'other-bucket'), url.replace('/previews/test', '/originals/test'),
+    url + '?X-Amz-Signature=secret', url.replace('storage.yandexcloud.net', 'evil.test')]) assert.equal(getWallpaperImageUrl(invalid), null);
 });

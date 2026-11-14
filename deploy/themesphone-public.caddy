@@ -13,6 +13,19 @@ themesphone.ru, www.themesphone.ru, themesphone.com, www.themesphone.com {
             path /api/top-wallpapers
         }
         reverse_proxy @top themesphone-frontend:3000
+        @download {
+            method GET HEAD
+            path /api/download
+            expression `{http.request.uri}.matches('^/api/download([?]|$)') && {query.file}.matches('^[a-zA-Z0-9]{1,64}$') && {query.url} == '' && {query.name} == ''`
+        }
+        reverse_proxy @download themesphone-frontend:3000
+        @invalid_download {
+            method GET HEAD
+            path /api/download
+            expression `{http.request.uri}.matches('^/api/download([?]|$)')`
+        }
+        header @invalid_download Content-Type "application/json; charset=utf-8"
+        respond @invalid_download `{"error":"invalid_file"}` 400
         @self {
             method GET
             path /api/me
@@ -53,6 +66,13 @@ cms.themesphone.ru {
     }
     route {
         respond /healthz "OK" 200
+        @original_upload {
+            method POST
+            path /wallpaper-originals/*
+        }
+        request_body @original_upload {
+            max_size 52MB
+        }
         @catalogue {
             method GET HEAD
             path /api/wallpapers /api/wallpapers/* /api/categories /api/categories/* /api/devices /api/devices/*

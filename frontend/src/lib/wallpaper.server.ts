@@ -1,3 +1,5 @@
+import type { OriginalFile } from './download-links';
+
 export type DescriptionNode = {
   text?: string;
   children?: DescriptionNode[];
@@ -23,6 +25,7 @@ export type Wallpaper = {
   image?: WallpaperImage[];
   categories?: { title: string; slug: string }[];
   device?: { title: string; slug: string } | null;
+  originalFile?: OriginalFile | null;
 };
 
 // Only server components import this module: Docker DNS stays on the server.
@@ -63,7 +66,11 @@ export function getWallpaperImageUrl(path: string): string | null {
   try {
     const origin = new URL(process.env.NEXT_PUBLIC_STRAPI_URL || 'http://127.0.0.1:1337');
     const url = new URL(path, origin);
-    return url.origin === origin.origin && url.pathname.startsWith('/uploads/') ? url.href : null;
+    const bucket = process.env.S3_PREVIEWS_BUCKET;
+    if (bucket && /^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$/.test(bucket) &&
+        url.origin === 'https://storage.yandexcloud.net' && url.pathname.startsWith(`/${bucket}/previews/`) &&
+        !url.search && !url.hash && !url.username && !url.password) return url.href;
+    return url.origin === origin.origin && url.pathname.startsWith('/uploads/') && !url.username && !url.password ? url.href : null;
   } catch {
     return null;
   }

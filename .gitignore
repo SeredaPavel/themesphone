@@ -27,6 +27,7 @@ coverage/
 /backend/public/uploads/*
 !/backend/public/uploads/.gitkeep
 /backend/exports/
+/backend/.private/
 /backend/.strapi-updater.json
 /backend/.strapi-cloud.json
 

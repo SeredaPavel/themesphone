@@ -1,0 +1,21 @@
+{
+  "kind": "collectionType",
+  "collectionName": "wallpaper_files",
+  "info": { "singularName": "wallpaper-file", "pluralName": "wallpaper-files", "displayName": "Wallpaper original" },
+  "options": { "draftAndPublish": false },
+  "pluginOptions": { "content-manager": { "visible": false }, "content-type-builder": { "visible": false } },
+  "attributes": {
+    "wallpaperDocumentId": { "type": "string", "required": true, "unique": true, "private": true },
+    "storageKey": { "type": "string", "required": true, "private": true },
+    "storageProvider": { "type": "enumeration", "enum": ["local", "s3"], "default": "local", "private": true },
+    "storageBucket": { "type": "string", "private": true },
+    "storageVersion": { "type": "string", "private": true },
+    "storageETag": { "type": "string", "private": true },
+    "sha256": { "type": "string", "required": true, "private": true },
+    "mime": { "type": "enumeration", "enum": ["image/jpeg", "image/png", "image/webp"], "required": true },
+    "bytes": { "type": "biginteger", "required": true },
+    "width": { "type": "integer", "required": true },
+    "height": { "type": "integer", "required": true },
+    "ready": { "type": "boolean", "default": false }
+  }
+}

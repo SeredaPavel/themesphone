@@ -43,6 +43,11 @@ Never run down -v if the database must be kept. Local runtime env files must not
 
 Frontend build uses standalone output only when DOCKER_BUILD=1, so normal native Windows builds can still use npm run start. NEXT_PUBLIC_STRAPI_URL and the admin backend URL are public build-time settings; rebuild images when changing these public addresses. STRAPI_API_URL is server-only and resolves to http://backend:1337 inside Docker.
 
-These files do not complete authorization, checkout or download implementation. The mock payment endpoint, unrestricted download proxy and client-side API-token reference remain known blockers for unrestricted public exposure. Keep the local instance on loopback; prepare protected VPS access separately.
+Authorization is covered separately in AUTH_LOCAL.md. The arbitrary-URL download
+proxy has been replaced with bounded original-file delivery by ID. Private storage,
+generated previews and production activation are documented in
+../backend/FILE_DELIVERY.md; the public download API remains closed until that setup.
+The mock payment endpoint and legacy checkout remain blocked. Keep local ports
+on loopback and prepare VPS changes separately.
 
 Validation in the preparation environment: diff checks and static configuration checks only. Docker builds, runtime health checks and data restore must be verified on the Windows Docker engine.
