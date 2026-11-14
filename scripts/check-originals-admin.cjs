@@ -60,6 +60,10 @@ async function main() {
     const bytes = await req('sharp')({ create: { width: 736, height: 1449, channels: 3, background: '#12545a' } }).jpeg().toBuffer();
     const form = (contents = bytes) => { const body = new FormData(); body.append('files', new Blob([contents], { type: 'image/jpeg' }), 'test.jpg'); return body; };
     phase = 'upload validation';
+    assert.equal((await call('/api/wallpapers?status=draft', {}, '')).status, 400);
+    assert.equal((await call('/api/wallpapers/' + docs[0], {}, '')).status, 404);
+    assert.equal((await call('/api/wallpapers/missingS3CheckDocument', {}, '')).status, 404);
+    assert.equal((await call('/api/wallpapers/' + docs[0] + '?status=draft', {}, '')).status, 400);
     assert.equal((await call('/wallpaper-originals/' + docs[1], { method: 'POST', body: form(Buffer.from('invalid image')) })).status, 400);
     assert.equal(await app.db.query(FILE).findOne({ where: { wallpaperDocumentId: docs[1] } }), null);
     phase = 'real S3 upload through admin HTTP';
@@ -97,7 +101,7 @@ async function main() {
     await app.documents(WALLPAPER).unpublish({ documentId: docs[0] }); assert.equal((await download(request)).status, 404);
     assert.equal(await app.db.query('plugin::users-permissions.user').count(), originalUsers);
     console.log(JSON.stringify({ pass: true, adminAuthentication: true, adminPermissions: true, draftUpload: true, noImplicitPublication: true,
-      invalidImageDenied: true, duplicateDenied: true, privateOriginals: true, freeSignedDownload: true, paidDenied: true, publicPreview: true, unpublishedDenied: true }));
+      publicDraftsDenied: true, invalidImageDenied: true, duplicateDenied: true, privateOriginals: true, freeSignedDownload: true, paidDenied: true, publicPreview: true, unpublishedDenied: true }));
   } finally {
     if (loaded) {
       const originals = docs.length ? await app.db.query(FILE).findMany({ where: { wallpaperDocumentId: { $in: docs } } }) : [];
