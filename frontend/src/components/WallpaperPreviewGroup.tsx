@@ -5,7 +5,7 @@ import type { ReactNode } from 'react';
 import { centeredWallpaper } from '@/lib/wallpaper-preview';
 
 const ActivePreview = createContext<string | null>(null);
-const PREVIEW_DELAY_MS = 400;
+const PREVIEW_DELAY_MS = 200;
 
 export function useWallpaperPreview(id: string) {
   return useContext(ActivePreview) === id;

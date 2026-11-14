@@ -1,11 +1,24 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { ChevronDown, Menu, X } from 'lucide-react';
 import type { TaxonomyItem } from '@/lib/api';
 import CatalogBackLink from './CatalogBackLink';
+
+function MobileMenuSection({ title, children }: { title: string; children: ReactNode }) {
+  const [expanded, setExpanded] = useState(false);
+  const contentId = useId();
+
+  return <div>
+    <button type="button" className="liquid-pill w-full !justify-between" aria-expanded={expanded}
+      aria-controls={contentId} onClick={() => setExpanded(value => !value)}>
+      {title}<ChevronDown size={16} className={`disclosure-chevron ${expanded ? 'rotate-180' : ''}`} />
+    </button>
+    <div id={contentId} hidden={!expanded}>{children}</div>
+  </div>;
+}
 
 export default function BurgerMenu({ categories, locationKey, backHref, restoreBackScroll, cartCount, user, authReady, loadingCategories, renderFilter, onCart, onLogin, onLogout }: {
   categories: TaxonomyItem[]; locationKey: string; backHref?: string; restoreBackScroll: boolean;
@@ -30,24 +43,22 @@ export default function BurgerMenu({ categories, locationKey, backHref, restoreB
   }, [open]);
   const act = (action: () => void) => { setOpen(false); action(); };
   return <div ref={container} className="md:hidden relative z-50">
-    <button ref={trigger} onClick={() => setOpen(!open)} aria-label={open ? 'Закрыть меню' : 'Открыть меню'} aria-expanded={open} aria-controls="mobile-navigation" className="liquid-pill !p-3">
+    <button ref={trigger} type="button" onClick={() => setOpen(value => !value)} aria-label={open ? 'Закрыть меню' : 'Открыть меню'} aria-expanded={open} aria-controls="mobile-navigation" className="liquid-pill !p-3">
       {open ? <X size={22} /> : <Menu size={22} />}
     </button>
     {open && <nav id="mobile-navigation" aria-label="Мобильное меню" className="glass-panel absolute top-full right-0 mt-3 w-72 max-w-[calc(100vw-40px)] max-h-[calc(100dvh-110px)] overflow-y-auto p-3 space-y-2">
       {backHref && <CatalogBackLink href={backHref} restoreScroll={restoreBackScroll} onNavigate={() => setOpen(false)} className="liquid-pill w-full !justify-start" />}
-      <details className="soft-disclosure">
-        <summary className="liquid-pill w-full !justify-between">Категории<ChevronDown size={16} className="disclosure-chevron" /></summary>
+      <MobileMenuSection title="Категории">
         <div className="menu-stack mt-2 pl-2">
           <Link href="/" className="liquid-pill" onClick={() => setOpen(false)}>Все обои</Link>
           <Link href="/category" className="liquid-pill" onClick={() => setOpen(false)}>Все категории</Link>
           {categories.map(category => <Link key={category.id} className="liquid-pill" href={`/category/${encodeURIComponent(category.slug)}`} onClick={() => setOpen(false)}>{category.title}</Link>)}
           {loadingCategories && <p role="status">Загрузка…</p>}
         </div>
-      </details>
-      <details className="soft-disclosure">
-        <summary className="liquid-pill w-full !justify-between">Фильтр<ChevronDown size={16} className="disclosure-chevron" /></summary>
+      </MobileMenuSection>
+      <MobileMenuSection title="Фильтр">
         <div className="mt-3 pb-2">{renderFilter(() => setOpen(false))}</div>
-      </details>
+      </MobileMenuSection>
       <button onClick={() => act(onCart)} className="liquid-pill w-full !justify-start">Корзина{cartCount > 0 ? ` (${cartCount})` : ''}</button>
       {authReady && (user ? <div className="border-t pt-3 space-y-3">
         <Link href="/account" onClick={() => setOpen(false)} className="liquid-pill w-full !justify-start">Профиль</Link>
