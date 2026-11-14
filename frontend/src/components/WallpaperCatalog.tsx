@@ -5,6 +5,7 @@ import { catalogPageHref, catalogLocationFilters } from '@/lib/catalog-query';
 import type { CatalogSearchParams } from '@/lib/catalog-query';
 import { getWallpaperImageUrl } from '@/lib/wallpaper.server';
 import WallpaperCard from './WallpaperCard';
+import WallpaperPreviewGroup from './WallpaperPreviewGroup';
 import CatalogScrollRestorer from './CatalogScrollRestorer';
 
 export default async function WallpaperCatalog({ searchParams, category, device }: {
@@ -31,7 +32,7 @@ export default async function WallpaperCatalog({ searchParams, category, device 
       <CatalogScrollRestorer href={returnTo} />
       <h1 className="sr-only">{title}</h1>
       {data.length > 0 ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-6 gap-y-5" data-wallpaper-grid>
+        <WallpaperPreviewGroup key={returnTo} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-6 gap-y-5">
           {data.map(wallpaper => {
             const image = wallpaper.image?.find(item => !item.mime || item.mime.startsWith('image/'));
             const imageUrl = image ? getWallpaperImageUrl(image.formats?.medium?.url || image.formats?.small?.url || image.url) || '' : '';
@@ -42,7 +43,7 @@ export default async function WallpaperCatalog({ searchParams, category, device 
               price={Number.isFinite(price) && price >= 0 ? price : undefined}
               category={wallpaper.categories?.[0] || null} device={wallpaper.device || null} />;
           })}
-        </div>
+        </WallpaperPreviewGroup>
       ) : (
         <div className="glass-panel p-6">
           <h2 className="text-xl font-bold mb-2">Обои не найдены</h2>

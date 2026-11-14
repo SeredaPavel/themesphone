@@ -5,7 +5,7 @@
 .shell { position:absolute; inset:0; padding:clamp(3px,1.9cqi,6px); border-radius:inherit; background:linear-gradient(120deg,#e2cbc0,#796967 18%,#2c292f 43%,#9c918b 72%,#514a4e); border:1px solid #dfc7bd8c; box-shadow:inset 0 0 0 2px #e6dad245,1px 2px 1px #0e171cd9,16px 22px 55px #001f2e4a; }
 .shell::after { content:''; position:absolute; inset:1px; border:1px solid #f5e4d13b; border-radius:inherit; pointer-events:none; }
 .screen { width:100%; height:100%; position:relative; isolation:isolate; border-radius:15.5% / 7.2%; background:#08121a; border:clamp(1px,.9cqi,3px) solid #0a0c12; overflow:hidden; }
-.wallpaperToggle { position:absolute; inset:0; display:block; width:100%; height:100%; padding:0; border:0; background:transparent; border-radius:inherit; cursor:zoom-in; overflow:hidden; touch-action:pan-y; }
+.wallpaperToggle { position:absolute; inset:0; display:block; width:100%; height:100%; padding:0; border:0; background:transparent; border-radius:inherit; cursor:zoom-in; overflow:hidden; touch-action:pan-y pinch-zoom; }
 .wallpaperToggle:focus-visible { outline:2px solid #d9fff5; outline-offset:-3px; }
 .wallpaper { width:100%; height:100%; object-fit:cover; transform:scale(1); transition:transform 1.1s cubic-bezier(.2,.75,.2,1); }
 .imageFallback { display:grid; height:100%; place-items:center; padding:18px; color:#b4d8d8; font-size:clamp(9px,4cqi,14px); }

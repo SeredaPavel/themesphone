@@ -11,6 +11,7 @@ import {wallpaperDetailHref} from '@/lib/catalog-query';
 import {rememberCatalogScroll} from '@/lib/catalog-scroll';
 import AuthModal from './AuthModal';
 import PhoneFrame from './PhoneFrame';
+import {useWallpaperPreview} from './WallpaperPreviewGroup';
 import type {PhoneDevice} from './PhoneFrame';
 import {commerceMessages} from './CommerceNotice';
 import styles from './WallpaperCard.module.css';
@@ -19,11 +20,12 @@ type Props={id:number;documentId?:string;returnTo?:string;title:string;imageUrl:
 
 export default function WallpaperCard({id,documentId,returnTo,title,imageUrl,isFree,price,device,category,compact=false}:Props) {
   const [hovered,setHovered]=useState(false);
-  const [touchLayout,setTouchLayout]=useState(false);
   const [keyboardFocus,setKeyboardFocus]=useState(false);
   const [added,setAdded]=useState(false);
   const [isAuthOpen,setIsAuthOpen]=useState(false);
-  const expanded=touchLayout || hovered || keyboardFocus;
+  const previewId=documentId || String(id);
+  const mobilePreview=useWallpaperPreview(previewId);
+  const expanded=mobilePreview || hovered || keyboardFocus;
   const detailsId=useId(),availabilityId=useId();
   const detailUrl=wallpaperDetailHref(documentId || String(id),returnTo);
   const rememberPosition=()=>{if(returnTo)rememberCatalogScroll(returnTo);};
@@ -33,12 +35,6 @@ export default function WallpaperCard({id,documentId,returnTo,title,imageUrl,isF
   const {user}=useAuthContext();
   const router=useRouter();
 
-  useEffect(()=>{
-    const media=window.matchMedia('(hover: none)');
-    const update=()=>setTouchLayout(media.matches);
-    update();media.addEventListener('change',update);
-    return()=>media.removeEventListener('change',update);
-  },[]);
   useEffect(()=>{if(!added)return;const timer=setTimeout(()=>setAdded(false),2000);return()=>clearTimeout(timer);},[added]);
 
   function openProduct(event:MouseEvent<HTMLElement>) {
@@ -64,7 +60,7 @@ export default function WallpaperCard({id,documentId,returnTo,title,imageUrl,isF
   }
 
   return <>
-    <article className={`${styles.card}${compact?' '+styles.compact:''}`} aria-label={title} data-wallpaper-card data-compact={compact} onClick={openProduct}
+    <article className={`${styles.card}${compact?' '+styles.compact:''}`} aria-label={title} data-wallpaper-card data-compact={compact} data-preview-id={compact?undefined:previewId} onClick={openProduct}
       onPointerEnter={event=>{if(event.pointerType==='mouse')setHovered(true);}} onPointerLeave={()=>setHovered(false)}
       onFocusCapture={event=>{if(event.target.matches(':focus-visible'))setKeyboardFocus(true);}}
       onBlurCapture={event=>{if(!event.currentTarget.contains(event.relatedTarget))setKeyboardFocus(false);}}
