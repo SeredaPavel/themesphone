@@ -1,7 +1,7 @@
 'use client'
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
-import {normalizeCart,readCart,completeCartOrder,rememberCartOrder,forgetCartOrder} from '@/lib/cart-storage'
+import {normalizeCart,readCart,completeCartOrder,completePendingCartOrder,rememberCartOrder,forgetCartOrder} from '@/lib/cart-storage'
 import type {CartItem,StoredCart} from '@/lib/cart-storage'
 import type {CartPurchase,ShopOrder} from '@/lib/checkout'
 import {useAuthContext} from './AuthContext'
@@ -79,7 +79,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const restartCheckout = () => setCart(prev=>({...prev,checkoutKey:crypto.randomUUID()}))
   const completeOrder=useCallback((order:{id:string;state:string;items:{documentId:string}[]})=>{
     if(isReady&&['paid','test_paid'].includes(order.state)){
-      setCart(prev=>completeCartOrder(prev,order,()=>crypto.randomUUID()))
+      setCart(prev=>completePendingCartOrder(prev,order,activeUser.current||0,()=>crypto.randomUUID()))
       refreshPurchases()
     }
   },[isReady,refreshPurchases])

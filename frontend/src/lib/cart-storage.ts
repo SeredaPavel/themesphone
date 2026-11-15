@@ -47,3 +47,7 @@ export function forgetCartOrder(cart:StoredCart,id:string):StoredCart {
   if(!cart.pendingOrders?.some(row=>row.id===id))return cart;
   return {...cart,pendingOrders:cart.pendingOrders.filter(row=>row.id!==id)};
 }
+export function completePendingCartOrder(cart:StoredCart,order:{id:string;state:string;items:{documentId:string}[]},userId:number,newKey:()=>string):StoredCart {
+  if(!cart.pendingOrders?.some(row=>row.id===order.id&&row.userId===userId))return cart;
+  return completeCartOrder(cart,order,newKey);
+}

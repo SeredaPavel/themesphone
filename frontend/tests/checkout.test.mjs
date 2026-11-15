@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {test,mock,afterEach} from 'node:test';
 import {randomUUID} from 'node:crypto';
 import {startCheckout,getCheckout,getOrders,cancelCheckout,paymentUnavailable,checkoutPayment,paymentNotification} from '../src/lib/checkout.ts';
-import {normalizeCart,readCart,completeCartOrder,rememberCartOrder,forgetCartOrder} from '../src/lib/cart-storage.ts';
+import {normalizeCart,readCart,completeCartOrder,completePendingCartOrder,rememberCartOrder,forgetCartOrder} from '../src/lib/cart-storage.ts';
 import {cartCheckout} from '../src/lib/cart-checkout.ts';
 import {prepareQuickBuy,payQuickBuy,quickBuyStorageKey,readQuickBuyKey} from '../src/lib/quick-buy.ts';
 const originalCms=process.env.STRAPI_API_URL;
@@ -90,6 +90,16 @@ test('already purchased goods remain visible and contribute nothing to the new c
     assert.deepEqual(cartCheckout([item],purchases),{unpaid:[],total:0});
   }
   assert.deepEqual(cartCheckout([item],{}),{unpaid:[item],total:299});
+});
+
+test('opening historical receipts on a new browser does not erase a re-added purchased item',()=>{
+  const item={id:1,documentId:id,title:'Обои',price:299,imageUrl:'/preview.jpg'};
+  const cart={version:2,checkoutKey:randomUUID(),items:[item]},paid={id:ref,state:'paid',items:[{documentId:id}]};
+  const rotate=()=>randomUUID();
+  assert.equal(completePendingCartOrder(cart,paid,42,rotate),cart);
+  const tracked=rememberCartOrder(cart,ref,42);
+  assert.equal(completePendingCartOrder(tracked,paid,43,rotate),tracked);
+  assert.deepEqual(completePendingCartOrder(tracked,paid,42,rotate).items,[]);
 });
 test('payment BFF passes the session and stored order ID only, rejects forged redirects and financial input',async()=>{
   process.env.STRAPI_API_URL='http://cms:1337';process.env.PAYMENTS_ENABLED='true';
