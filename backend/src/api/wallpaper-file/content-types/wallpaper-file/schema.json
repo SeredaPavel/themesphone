@@ -16,6 +16,7 @@
     "bytes": { "type": "biginteger", "required": true },
     "width": { "type": "integer", "required": true },
     "height": { "type": "integer", "required": true },
-    "ready": { "type": "boolean", "default": false }
+    "ready": { "type": "boolean", "default": false },
+    "testOnly": { "type":"boolean", "default":false, "private":true }
   }
 }

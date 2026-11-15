@@ -4,10 +4,14 @@ const { downloadOriginal, FileError } = require('../../../lib/wallpaper-files');
 module.exports = {
   async download(ctx) {
     try {
+      let userId;
+      const token=ctx.get('authorization')?.match(/^Bearer ([A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+)$/)?.[1];
+      if(token){try{const payload=await strapi.plugin('users-permissions').service('jwt').verify(token);if(Number.isInteger(payload.id))userId=payload.id;}catch{/* Public free downloads remain accessible. */}}
       const file = await downloadOriginal(strapi, ctx.params.fileId, {
         directory: process.env.WALLPAPER_ORIGINALS_DIR,
         publicDirectory: strapi.dirs.static.public,
         method: ctx.method,
+        userId,orderReference:typeof ctx.query.order==='string'?ctx.query.order:undefined,
       });
       ctx.set('Content-Type', file.info.mime);
       ctx.set('Content-Length', String(file.info.bytes));

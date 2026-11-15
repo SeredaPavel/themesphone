@@ -13,6 +13,8 @@
     "currency":{"type":"enumeration","enum":["RUB"],"default":"RUB","required":true},
     "state":{"type":"enumeration","enum":["awaiting_payment","cancelled","test_paid","paid"],"default":"awaiting_payment","required":true},
     "expiresAt":{"type":"datetime","required":true},
+    "paidAt":{"type":"datetime","private":true},
+    "downloadDays":{"type":"integer","default":0,"min":0,"max":3650,"private":true},
     "owner":{"type":"relation","relation":"manyToOne","target":"plugin::users-permissions.user","private":true}
   }
 }

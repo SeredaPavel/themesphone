@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {test,mock,afterEach} from 'node:test';
 import {randomUUID} from 'node:crypto';
-import {startCheckout,getCheckout,cancelCheckout,paymentUnavailable,checkoutPayment,paymentNotification} from '../src/lib/checkout.ts';
+import {startCheckout,getCheckout,getOrders,cancelCheckout,paymentUnavailable,checkoutPayment,paymentNotification} from '../src/lib/checkout.ts';
 import {normalizeCart,readCart,completeCartOrder} from '../src/lib/cart-storage.ts';
 const originalCms=process.env.STRAPI_API_URL;
 const paymentEnv=Object.fromEntries(['PAYMENTS_ENABLED','PAYMENT_WEBHOOK_BRIDGE_SECRET'].map(key=>[key,process.env[key]]));
@@ -92,4 +92,15 @@ test('webhook forwards only a bounded notification to an authenticated internal 
   });
   const response=await paymentNotification(request({type:'notification',event:'payment.succeeded',object:{id:providerId,paid:true}}));assert.equal(response.status,200);assert.deepEqual(await response.json(),{accepted:true});
   assert.equal((await paymentNotification(request({type:'notification',event:'payment.succeeded',object:{id:'https://evil.example'}}))).status,400);
+});
+test('history uses only the current session, bounds pages and strips private original details',async()=>{
+  process.env.STRAPI_API_URL='http://cms:1337';
+  const expected={...order(),state:'test_paid',items:order().items.map(item=>({...item,download:{status:'available',fileId:'file123',expiresAt:null}}))};
+  mock.method(globalThis,'fetch',async(url,options)=>{
+    assert.equal(url,'http://cms:1337/api/shop-orders?page=2');assert.equal(options.headers.Authorization,'Bearer user.session.jwt');
+    return Response.json({orders:[{...expected,owner:99,items:expected.items.map(item=>({...item,storageKey:'private',download:{...item.download,storageBucket:'private'}}))}],hasMore:false});
+  });
+  const request=url=>new Request(url,{headers:{Cookie:'token=user.session.jwt'}});
+  const result=await getOrders(request('https://shop.example/api/account/orders?page=2'));assert.equal(result.status,200);assert.deepEqual(await result.json(),{orders:[expected],hasMore:false});
+  for(const query of ['page=0','page=1&page=2','page=10000','owner=99','populate=*'])assert.equal((await getOrders(request('https://shop.example/api/account/orders?'+query))).status,400);
 });

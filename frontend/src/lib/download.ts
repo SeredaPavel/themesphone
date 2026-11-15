@@ -17,7 +17,8 @@ function failure(request: Request, code: string, status: number) {
 export async function download(request: Request) {
   const query = new URL(request.url).searchParams;
   const id = query.get('file');
-  if (!validFileId(id) || Array.from(query.keys()).some(key => !['file', 'wallpaper', 'from'].includes(key) || query.getAll(key).length !== 1)) return failure(request, 'invalid_file', 400);
+  const order=query.get('order');
+  if (!validFileId(id) || (order!==null&&!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(order)) || Array.from(query.keys()).some(key => !['file', 'wallpaper', 'from','order'].includes(key) || query.getAll(key).length !== 1)) return failure(request, 'invalid_file', 400);
 
   let origin: URL;
   try {
@@ -31,11 +32,13 @@ export async function download(request: Request) {
   request.signal.addEventListener('abort', onAbort, { once: true });
   const cleanup = () => { clearTimeout(timeout); request.signal.removeEventListener('abort', onAbort); };
   let upstream: Response | undefined;
+  let token='';try{token=decodeURIComponent(request.headers.get('cookie')?.match(/(?:^|;\s*)token=([^;]+)/)?.[1]||'');}catch{/* Ignore malformed cookies on public downloads. */}
+  const userToken=/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(token)?token:null;
   try {
     if (request.signal.aborted) throw Error();
-    upstream = await fetch(`${origin.origin}/api/wallpaper-files/${encodeURIComponent(id)}/download`, {
+    upstream = await fetch(`${origin.origin}/api/wallpaper-files/${encodeURIComponent(id)}/download${order?'?order='+encodeURIComponent(order):''}`, {
       method: request.method === 'HEAD' ? 'HEAD' : 'GET', cache: 'no-store', redirect: 'manual',
-      headers: { 'Accept-Encoding': 'identity' }, signal: abort.signal,
+      headers: { 'Accept-Encoding': 'identity',...(order&&userToken?{Authorization:'Bearer '+userToken}:{}) }, signal: abort.signal,
     });
     if (upstream.status === 302 && request.method !== 'HEAD') {
       const bucket = process.env.S3_ORIGINALS_BUCKET;
@@ -55,9 +58,10 @@ export async function download(request: Request) {
         'Cache-Control': 'private, no-store', 'Referrer-Policy': 'no-referrer', 'X-Content-Type-Options': 'nosniff' } });
     }
     if (upstream.status !== 200) {
-      await upstream.body?.cancel(); cleanup();
+      const problem=await upstream.json().catch(()=>null); cleanup();
       const status = [403, 404, 429].includes(upstream.status) ? upstream.status : 503;
-      return failure(request, status === 403 ? 'payment_required' : status === 404 ? 'file_unavailable' : 'service_unavailable', status);
+      const reason=status===403&&['download_expired','test_purchase','access_revoked'].includes(problem?.error)?problem.error:status === 403 ? 'payment_required' : status === 404 ? 'file_unavailable' : 'service_unavailable';
+      return failure(request,reason,status);
     }
     const mime = upstream.headers.get('content-type')?.split(';')[0].trim();
     const length = upstream.headers.get('content-length');

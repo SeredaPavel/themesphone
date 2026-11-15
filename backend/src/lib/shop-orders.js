@@ -2,6 +2,7 @@
 
 const { createHash, randomUUID } = require('node:crypto');
 const { FILE, WALLPAPER, metadata } = require('./wallpaper-files');
+const {downloadDaysSetting,presentOrders}=require('./order-downloads');
 const ORDER = 'api::shop-order.shop-order';
 const USER = 'plugin::users-permissions.user';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
@@ -72,6 +73,7 @@ function createOrders(strapi) {
           reference: randomUUID(), checkoutKey, requestHash: input.requestHash, owner: userId,
           items, totalKopecks: String(totalKopecks), currency: 'RUB', state: 'awaiting_payment',
           expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+          downloadDays:downloadDaysSetting(),
         } });
         return publicOrder(row);
       });
@@ -81,14 +83,14 @@ function createOrders(strapi) {
       return withOwner(strapi, userId, async () => {
         const row = await query().findOne({ where: { reference: id, owner: { id: userId } } });
         if (!row) throw new OrderError('order_not_found', 404);
-        return publicOrder(row);
+        return (await presentOrders(strapi,[row]))[0];
       });
     },
     async list(userId, page = '1') {
       if (typeof page !== 'string' || !/^[1-9]\d{0,3}$/.test(page)) throw new OrderError('invalid_page');
       return withOwner(strapi, userId, async () => {
         const rows = await query().findMany({ where: { owner: { id: userId } }, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], offset: (Number(page) - 1) * 20, limit: 21 });
-        return { orders: rows.slice(0, 20).map(row => publicOrder(row)), hasMore: rows.length > 20 };
+        return { orders: await presentOrders(strapi,rows.slice(0,20)), hasMore: rows.length > 20 };
       });
     },
     async cancel(userId, id) {

@@ -7,6 +7,7 @@ import AuthPanel,{AuthStack,AuthNotice} from '@/components/auth/AuthSurface';
 import {PaymentMethods} from '@/components/PaymentPopup';
 import type {ShopOrder} from '@/lib/checkout';
 import {useCart} from '@/context/CartContext';
+import OrderDownload from '@/components/OrderDownload';
 const money=(kopecks:number)=>(kopecks/100).toLocaleString('ru-RU',{style:'currency',currency:'RUB'});
 const labels:Record<ShopOrder['state'],string>={awaiting_payment:'Ожидает оплаты',cancelled:'Заказ отменён',expired:'Срок заказа истёк',test_paid:'Тестовая оплата подтверждена',paid:'Оплачен'};
 
@@ -54,7 +55,7 @@ export default function CheckoutContent({paymentsEnabled}:{paymentsEnabled:boole
     {order && <div className="space-y-4">
       <p className="auth-copy">{labels[order.state]} · № {order.id.slice(0,8)}</p>
       <ul className="divide-y divide-white/15">{order.items.map(item=><li key={item.documentId} className="flex justify-between gap-4 py-3 text-sm">
-        <Link href={'/wallpaper/'+item.documentId} className="hover:underline">{item.title}</Link><span className="shrink-0">{money(item.unitKopecks)}</span>
+        <div><Link href={'/wallpaper/'+item.documentId} className="hover:underline">{item.title}</Link><OrderDownload order={order.id} wallpaper={item.documentId} download={item.download}/></div><span className="shrink-0">{money(item.unitKopecks)}</span>
       </li>)}</ul>
       <p className="flex justify-between gap-4 text-lg"><span>Итого</span><strong>{money(order.totalKopecks)}</strong></p>
       {order.state==='awaiting_payment' && <>
@@ -63,9 +64,10 @@ export default function CheckoutContent({paymentsEnabled}:{paymentsEnabled:boole
         {payment?<button type="button" className="auth-link" onClick={()=>pay(true)} disabled={pending}>Проверить оплату</button>:<button type="button" className="auth-link" onClick={cancel} disabled={pending}>{pending?'Отменяем…':'Отменить заказ'}</button>}
       </>}
       {order.state==='expired' && <p className="auth-copy">Оформите заказ заново из корзины — стоимость будет проверена ещё раз.</p>}
-      {order.state==='test_paid' && <AuthNotice kind="success">ЮKassa подтвердила тестовую оплату. Деньги не списаны. Тестовая покупка не открывает платный оригинал.</AuthNotice>}
+      {order.state==='test_paid' && <AuthNotice kind="success">ЮKassa подтвердила тестовую оплату. Деньги не списаны. Для тестовых покупок доступны только специально подготовленные тестовые файлы.</AuthNotice>}
     </div>}
     {login && <Link href="/?auth=popup" className="auth-button auth-button--primary">Войти в аккаунт</Link>}
+    {order&&['paid','test_paid'].includes(order.state)&&<Link href="/account#orders" className="auth-button">Мои покупки</Link>}
     <Link href="/cart" className="auth-button" onClick={()=>{if(order && ['cancelled','expired'].includes(order.state))restartCheckout();}}>{order && ['cancelled','expired'].includes(order.state)?'Оформить заново из корзины':'Вернуться в корзину'}</Link>
   </AuthStack></AuthPanel></div>;
 }

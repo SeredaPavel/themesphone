@@ -33,6 +33,16 @@ test('file streaming uses only the configured backend and safe attachment header
   assert.equal(response.headers.get('content-disposition'), attachment);
   assert.equal(response.headers.get('x-content-type-options'), 'nosniff');
 });
+test('purchased download forwards only the HttpOnly session to the fixed CMS and preserves expiry errors',async()=>{
+  process.env.STRAPI_API_URL='http://backend:1337';const order='12345678-1234-4234-8234-123456789abc';
+  mock.method(globalThis,'fetch',async(url,options)=>{
+    assert.equal(url,'http://backend:1337/api/wallpaper-files/original123/download?order='+order);
+    assert.equal(options.headers.Authorization,'Bearer browser.session.jwt');return Response.json({error:'download_expired'},{status:403});
+  });
+  const response=await download(req('file=original123&order='+order,{headers:{Cookie:'token=browser.session.jwt',Authorization:'Bearer forged'}}));
+  assert.equal(response.status,403);assert.deepEqual(await response.json(),{error:'download_expired'});
+  const malformed=await download(req('file=original123&order=../orders'));assert.equal(malformed.status,400);
+});
 
 test('paid files and upstream redirects are never treated as downloads', async () => {
   process.env.STRAPI_API_URL = 'http://backend:1337';

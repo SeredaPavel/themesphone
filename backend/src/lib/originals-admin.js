@@ -36,7 +36,7 @@ function registerRoutes(strapi) {
       const publicIds = new Set(published.map(item => item.documentId));
       ctx.body = { data: items.map(item => ({ documentId: item.documentId, title: item.title, isFree: item.isFree,
         published: publicIds.has(item.documentId), original: byId.get(item.documentId) || null,
-        hasOriginal: byId.has(item.documentId) })), page, pages: Math.max(1, Math.ceil(total / 20)), total,
+        hasOriginal: byId.has(item.documentId), testOnly:originals.some(file=>file.wallpaperDocumentId===item.documentId&&file.testOnly===true) })), page, pages: Math.max(1, Math.ceil(total / 20)), total,
         storageReady: process.env.WALLPAPER_STORAGE_DRIVER === 's3' };
     }) },
     { method: 'POST', path: '/wallpaper-originals/:documentId', config: { policies }, handler: respond(async ctx => {
@@ -44,13 +44,15 @@ function registerRoutes(strapi) {
       const files = ctx.request.files || {};
       const file = files.files;
       if (!file || Array.isArray(file) || Object.keys(files).some(key => key !== 'files') ||
-          Object.keys(ctx.request.body || {}).length || typeof file.filepath !== 'string' ||
+          Object.keys(ctx.request.body || {}).some(key=>key!=='testOnly') ||
+          (ctx.request.body?.testOnly!==undefined&&!['true','false'].includes(ctx.request.body.testOnly)) || typeof file.filepath !== 'string' ||
           !Number.isSafeInteger(file.size) || file.size <= 0 || file.size > MAX_BYTES) throw new FileError('one_image_required', 400);
       if (uploading) { ctx.set('Retry-After', '2'); throw new FileError('upload_in_progress', 429); }
       uploading = true;
       try {
         const original = await importOriginal(strapi, ctx.params.documentId, file.filepath, {
           allowDraft: true, storageDriver: 's3', publicDirectory: strapi.dirs.static.public,
+          testOnly:ctx.request.body?.testOnly==='true',
         });
         ctx.status = 201;
         ctx.body = { data: original };

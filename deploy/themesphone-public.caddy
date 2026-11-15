@@ -60,6 +60,12 @@ themesphone.ru, www.themesphone.ru, themesphone.com, www.themesphone.com {
             max_size 8KB
         }
         reverse_proxy @checkout_start themesphone-frontend:3000
+        @order_history {
+            method GET
+            path /api/account/orders
+            expression `{http.request.uri}.matches('^/api/account/orders([?]|$)')`
+        }
+        reverse_proxy @order_history themesphone-frontend:3000
         @checkout_order {
             method GET POST
             path_regexp checkout_order ^/api/checkout/[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}(/payment)?$

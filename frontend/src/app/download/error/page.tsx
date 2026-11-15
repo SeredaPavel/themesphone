@@ -10,13 +10,17 @@ export default async function DownloadErrorPage({ searchParams }: {
 }) {
   const params = await searchParams;
   const message = params.reason === 'payment_required'
-    ? 'Этот оригинал доступен после покупки. Оплата пока готовится к запуску.'
+    ? 'Для скачивания войдите в аккаунт, которому принадлежит оплаченный заказ, и откройте покупку в кабинете.'
+    : params.reason==='download_expired'?'Срок повторного скачивания этой покупки истёк. Сведения о заказе сохранены в кабинете.'
+    : params.reason==='test_purchase'?'Тестовая оплата открывает только специально подготовленные тестовые файлы.'
+    : params.reason==='access_revoked'?'Доступ к скачиванию этой покупки прекращён. Обратитесь в поддержку.'
     : params.reason === 'file_unavailable'
       ? 'Оригинал пока недоступен. Вернитесь к обоям или выберите другой файл.'
       : 'Не удалось начать скачивание. Пожалуйста, попробуйте немного позже.';
   return <div className="min-h-[70dvh] grid place-items-center p-4">
     <AuthPanel title="Скачивание обоев"><AuthStack>
       <AuthNotice kind="error">{message}</AuthNotice>
+      <Link className="auth-button" href="/account">Мои заказы</Link>
       <Link className="auth-button auth-button--primary" href={downloadReturn(params.wallpaper, params.from)}>Вернуться к обоям</Link>
     </AuthStack></AuthPanel>
   </div>;

@@ -1,6 +1,6 @@
 'use strict';
 const {randomUUID}=require('node:crypto');
-const {ORDER,withOwner,publicOrder,OrderError}=require('./shop-orders');
+const {ORDER,withOwner,OrderError}=require('./shop-orders');
 const {PaymentError,PAYMENT_ID,configuration,amount,validatePayment,createYooKassa}=require('./yookassa');
 const PAYMENT='api::shop-payment.shop-payment';
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
@@ -36,7 +36,9 @@ function createPayments(strapi,options={}){
       // Terminal statuses cannot be downgraded by an older concurrent response.
       if(['succeeded','canceled'].includes(current.state)&&verified.state!==current.state)return;
       if(verified.state==='succeeded'&&row.state!=='test_paid'){
-        await order().update({where:{id:row.id},data:{state:'test_paid'}});
+        const capturedAt=raw.captured_at?Date.parse(raw.captured_at):Date.now();
+        if(!Number.isFinite(capturedAt)||capturedAt>Date.now()+300000)throw new PaymentError('payment_response_invalid');
+        await order().update({where:{id:row.id},data:{state:'test_paid',paidAt:row.paidAt||new Date(capturedAt)}});
       }else if(verified.state==='canceled'&&row.state==='awaiting_payment'){
         await order().update({where:{id:row.id},data:{state:'cancelled'}});
       }
@@ -46,7 +48,7 @@ function createPayments(strapi,options={}){
   async function response(userId,reference){
     return owned(userId,reference,async row=>{
       const attempt=await payments().findOne({where:{orderReference:reference}});
-      return {order:publicOrder(row),payment:attempt?{state:attempt.state,test:true,confirmationUrl:attempt.state==='pending'?attempt.confirmationUrl:null}:null};
+      return {order:(await require('./order-downloads').presentOrders(strapi,[row]))[0],payment:attempt?{state:attempt.state,test:true,confirmationUrl:attempt.state==='pending'?attempt.confirmationUrl:null}:null};
     });
   }
   return {

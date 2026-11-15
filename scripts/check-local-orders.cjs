@@ -34,7 +34,8 @@ async function main(){
   const {PaymentError}=require('../backend/src/lib/yookassa');
   const {FILE,WALLPAPER}=require('../backend/src/lib/wallpaper-files');
   const USER='plugin::users-permissions.user',IDENTITY='api::oauth-identity.oauth-identity',FLOW='api::oauth-flow.oauth-flow';
-  const users=[],docs=[],files=[],flows=[],identities=[];
+  const users=[],docs=[],files=[],flows=[],identities=[],uploads=[];
+  const scratch=fs.mkdtempSync(path.join(root,'.local/order-download-check-'));
   const tag='order-check-'+crypto.randomBytes(6).toString('hex');
   let loaded=false;
   try{
@@ -143,6 +144,42 @@ async function main(){
     assert.equal((await http('POST','payment-notifications/yookassa',notification,null)).status,403);
     assert.equal((await http('POST','shop-orders/'+paymentOrder.id+'/payment',{},other.id)).status,503);
     assert.equal((await http('GET','wallpaper-files/'+stored.items[0].originalFileId+'/download',undefined,owner.id)).status,403);
+    phase='private test original and repeat downloads';
+    const downloadable=await product('-download','299',false,true,false);
+    const originalPath=path.join(scratch,'source.jpg'),directory=path.join(scratch,'private');
+    const original=await requireBackend('sharp')({create:{width:64,height:128,channels:3,background:'#125c65'}}).jpeg().toBuffer();
+    fs.writeFileSync(originalPath,original);
+    const asset=await require('../backend/src/lib/wallpaper-files').importOriginal(app,downloadable.documentId,originalPath,{directory,publicDirectory:app.dirs.static.public,testOnly:true});
+    const savedFile=await app.db.query(FILE).findOne({where:{documentId:asset.id}});files.push(savedFile.id);
+    const savedWallpaper=await app.documents(WALLPAPER).findOne({documentId:downloadable.documentId,status:'published',populate:['image']});uploads.push(...savedWallpaper.image);
+    process.env.WALLPAPER_ORIGINALS_DIR=directory;
+    const downloadUser=await user('-download-oauth',false);tokens.set(downloadUser.id,token(downloadUser));
+    process.env.ORDER_DOWNLOAD_DAYS='0';
+    const downloadOrder=await createOrders(app).create(downloadUser.id,input([downloadable.documentId]));
+    await checkout.start(downloadUser.id,downloadOrder.id);
+    const paymentRaw=[...byId.values()].at(-1);paymentRaw.status='succeeded';paymentRaw.paid=true;
+    await checkout.webhook({type:'notification',event:'payment.succeeded',object:{id:paymentRaw.id}});
+    const granted=await createOrders(app).findOne(downloadUser.id,downloadOrder.id);assert.equal(granted.items[0].download.status,'available');
+    const {download}=await import(pathToFileURL(path.join(root,'frontend/src/lib/download.ts')).href);
+    function requestFile(userId,reference=downloadOrder.id){return new Request('http://127.0.0.1:3100/api/download?'+new URLSearchParams({file:asset.id,order:reference}),{headers:userId?{Cookie:'token='+tokens.get(userId)}:{}});}
+    assert.equal((await download(requestFile(other.id))).status,403);
+    assert.equal((await download(requestFile(null))).status,403);
+    assert.equal((await download(requestFile(downloadUser.id,crypto.randomUUID()))).status,403);
+    for(let repeat=0;repeat<2;repeat++){
+      const response=await download(requestFile(downloadUser.id));assert.equal(response.status,200);assert.ok(Buffer.from(await response.arrayBuffer()).equals(original));
+    }
+    await app.documents(WALLPAPER).unpublish({documentId:downloadable.documentId});
+    const afterUnpublish=await download(requestFile(downloadUser.id));assert.equal(afterUnpublish.status,200);await afterUnpublish.arrayBuffer();
+    const extraIdentity=await app.db.query(IDENTITY).create({data:{key:tag+'-download-identity',provider:'telegram',subject:tag+'-download',user:downloadUser.id}});identities.push(extraIdentity.id);
+    const secondContext={...context,provider:'telegram'};
+    const secondPending=await app.db.transaction(async({trx})=>{await merge.lockUsers(trx,[owner.id,downloadUser.id]);return merge.begin(secondContext,downloadUser.id,trx);});flows.push(digest(secondPending.mergePending));
+    await merge.confirm({...secondContext,merge:secondPending.mergePending,confirm:true,password:'local-test-password-123'});
+    const afterMerge=await download(requestFile(owner.id));assert.equal(afterMerge.status,200);await afterMerge.arrayBuffer();
+    assert.equal((await download(requestFile(downloadUser.id))).status,403);
+    const row=await app.db.query(ORDER).findOne({where:{reference:downloadOrder.id}});
+    await app.db.query(ORDER).update({where:{id:row.id},data:{downloadDays:1,paidAt:new Date(Date.now()-2*86400000)}});
+    const expired=await download(requestFile(owner.id));assert.equal(expired.status,403);assert.equal((await expired.json()).error,'download_expired');
+    assert.equal((await createOrders(app).findOne(owner.id,downloadOrder.id)).items[0].download.status,'download_expired');
     phase='disabled flag and paid downloads remain closed';
     process.env.ORDERS_ENABLED='false';assert.equal((await http('POST','shop-orders',input())).status,503);
     assert.equal((await http('GET','shop-orders/'+oauthOrder.id)).status,200);
@@ -159,10 +196,13 @@ async function main(){
       }
       for(const id of files)await app.db.query(FILE).delete({where:{id}});
       for(const documentId of docs)await app.documents(WALLPAPER).delete({documentId});
+      for(const media of uploads)await app.plugin('upload').service('upload').remove(media);
       for(const id of users)await app.db.query(USER).delete({where:{id}});
       console.log('Local test fixtures removed.');
     }
     await app.destroy();
+    if(path.dirname(path.resolve(scratch))!==path.join(root,'.local')||!path.basename(scratch).startsWith('order-download-check-'))throw Error('Unsafe scratch cleanup');
+    fs.rmSync(scratch,{recursive:true,force:true});
   }
 }
 main().catch(error=>{

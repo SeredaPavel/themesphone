@@ -19,6 +19,7 @@ export default function Originals() {
   const [list, setList] = useState(null), [page, setPage] = useState(1);
   const [search, setSearch] = useState(''), [query, setQuery] = useState('');
   const [selected, setSelected] = useState(null), [file, setFile] = useState(null);
+  const [testOnly,setTestOnly]=useState(false);
   const [busy, setBusy] = useState(false), [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState(null), [revision, setRevision] = useState(0);
 
@@ -31,7 +32,7 @@ export default function Originals() {
     return () => { active = false; };
   }, [get, page, query, revision]);
 
-  function choose(item) { setSelected(item); setFile(null); setNotice(null); }
+  function choose(item) { setSelected(item); setFile(null); setNotice(null);setTestOnly(false); }
   async function upload(event) {
     event.preventDefault();
     if (!selected || !file || busy) return;
@@ -39,6 +40,7 @@ export default function Originals() {
     setBusy(true); setNotice(null);
     try {
       const form = new FormData(); form.append('files', file);
+      if(testOnly)form.append('testOnly','true');
       await post('/wallpaper-originals/' + selected.documentId, form);
       setNotice({ text: 'Оригинал сохранён в закрытом хранилище, превью создано и привязано к товару.' });
       setSelected(null); setFile(null); setRevision(value => value + 1);
@@ -74,6 +76,7 @@ export default function Originals() {
       <h2>{selected.title}</h2><p>Оригинал хранится закрыто. Загрузка не публикует черновик и не меняет цену товара.</p>
       <label className="tp-originals__file">Оригинальный файл<input key={selected.documentId} type="file" accept=".jpg,.jpeg,.png,.webp" required disabled={busy} onChange={event => setFile(event.target.files?.[0] || null)}/></label>
       {file && <p>{file.name} · {size(file.size)}</p>}
+      <label className="tp-originals__hint"><input type="checkbox" checked={testOnly} disabled={busy} onChange={event=>setTestOnly(event.target.checked)}/> Тестовый файл — разрешить скачивание после тестовой оплаты. Для настоящих товаров оставьте выключенным.</label>
       <div className="tp-originals__actions"><button type="submit" disabled={busy || !file}>{busy ? 'Сохраняем и создаём превью…' : 'Загрузить оригинал'}</button><button type="button" disabled={busy} onClick={() => setSelected(null)}>Отмена</button></div>
       <p className="tp-originals__hint">Один товар — один оригинал. Для другого оригинала создайте новый товар.</p>
     </form>}

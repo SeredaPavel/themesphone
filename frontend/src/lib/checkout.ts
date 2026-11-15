@@ -2,8 +2,9 @@
 export type ShopOrder = {
   id:string; currency:'RUB'; totalKopecks:number;
   state:'awaiting_payment'|'cancelled'|'expired'|'test_paid'|'paid'; createdAt:string; expiresAt:string;
-  items:{documentId:string; title:string; unitKopecks:number; quantity:1}[];
+  items:{documentId:string; title:string; unitKopecks:number; quantity:1; download?:OrderDownload}[];
 };
+export type OrderDownload={status:'available'|'payment_required'|'test_purchase'|'download_expired'|'file_unavailable'|'access_revoked';fileId?:string;expiresAt:string|null};
 const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const documentId=/^[a-z0-9]{24}$/;
 const messages:Record<string,string>={
@@ -39,7 +40,15 @@ function safeOrder(value:any):ShopOrder {
     !Array.isArray(value.items) || !value.items.length || value.items.length>30)throw Error('Invalid order');
   const items=value.items.map((item:any)=>{
     if(!item || !documentId.test(item.documentId) || typeof item.title!=='string' || item.title.length>300 || item.quantity!==1 || !Number.isSafeInteger(item.unitKopecks) || item.unitKopecks<=0)throw Error('Invalid item');
-    return {documentId:item.documentId,title:item.title,quantity:1 as const,unitKopecks:item.unitKopecks};
+    let download:OrderDownload|undefined;
+    if(item.download!==undefined){
+      const d=item.download;
+      if(!d||!['available','payment_required','test_purchase','download_expired','file_unavailable','access_revoked'].includes(d.status)||
+        (d.expiresAt!==null&&(typeof d.expiresAt!=='string'||!Number.isFinite(Date.parse(d.expiresAt))))||
+        (d.status==='available'&&(typeof d.fileId!=='string'||!/^[a-zA-Z0-9]{1,64}$/.test(d.fileId))))throw Error('Invalid download');
+      download={status:d.status,expiresAt:d.expiresAt,...(d.status==='available'?{fileId:d.fileId}:{})};
+    }
+    return {documentId:item.documentId,title:item.title,quantity:1 as const,unitKopecks:item.unitKopecks,...(download?{download}:{})};
   });
   if(items.reduce((sum:number,item:ShopOrder['items'][number])=>sum+item.unitKopecks,0)!==value.totalKopecks)throw Error('Invalid total');
   return {id:value.id,currency:'RUB',totalKopecks:value.totalKopecks,state:value.state,createdAt:value.createdAt,expiresAt:value.expiresAt,items};
@@ -56,7 +65,7 @@ function safePayment(value:any){
   }
   return {state:value.state as string,test:true as const,confirmationUrl};
 }
-async function cms(req:Request,route:string,method='GET',data?:unknown,payment=false) {
+async function cms(req:Request,route:string,method='GET',data?:unknown,payment=false,list=false) {
   const token=session(req);
   if(!token)return json({error:messages.login_required},401);
   try {
@@ -71,6 +80,7 @@ async function cms(req:Request,route:string,method='GET',data?:unknown,payment=f
       const code=status===401?'login_required':status===404?'order_not_found':value?.error;
       return json({error:messages[code]||messages.orders_unavailable},status);
     }
+    if(list){if(!value||!Array.isArray(value.orders)||value.orders.length>20||typeof value.hasMore!=='boolean')throw Error();return json({orders:value.orders.map(safeOrder),hasMore:value.hasMore});}
     return payment?json({order:safeOrder(value.order),payment:safePayment(value.payment)}):json({order:safeOrder(value)});
   }catch{return json({error:messages.orders_unavailable},503);}
 }
@@ -89,6 +99,12 @@ export async function startCheckout(req:Request) {
 export async function getCheckout(req:Request,id:string) {
   if(!uuid.test(id))return json({error:messages.order_not_found},404);
   return cms(req,'shop-orders/'+id);
+}
+export async function getOrders(req:Request){
+  const query=new URL(req.url).searchParams;
+  const page=query.get('page')||'1';
+  if(Array.from(query.keys()).some(key=>key!=='page'||query.getAll(key).length!==1)||!/^[1-9]\d{0,3}$/.test(page))return json({error:messages.invalid_page},400);
+  return cms(req,'shop-orders?page='+page,'GET',undefined,false,true);
 }
 export async function cancelCheckout(req:Request,id:string) {
   if(!sameOrigin(req))return json({error:'Недопустимый источник запроса'},403);

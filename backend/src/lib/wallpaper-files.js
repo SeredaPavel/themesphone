@@ -82,11 +82,14 @@ async function downloadOriginal(strapi, id, options) {
   const file = await strapi.db.query(FILE).findOne({ where: { documentId: id, ready: true } });
   if (!metadata(file) || !ID.test(file.wallpaperDocumentId)) throw new FileError('file_unavailable', 404);
   const wallpaper = await strapi.documents(WALLPAPER).findOne({ documentId: file.wallpaperDocumentId, status: 'published', fields: ['title', 'isFree'] });
-  if (!wallpaper) throw new FileError('file_unavailable', 404);
-  // Prices, sessions and legacy paid:true orders cannot grant a download here.
-  // Paid entitlement will be added only with the verified order/payment model.
-  if (wallpaper.isFree !== true) throw new FileError('payment_required', 403);
-  const attachment = disposition(wallpaper.title, id, file.mime);
+  let title=wallpaper?.title;
+  if(wallpaper?.isFree!==true){
+    if(!options.userId||!options.orderReference)throw new FileError(wallpaper?'payment_required':'file_unavailable',wallpaper?403:404);
+    const permission=await require('./order-downloads').purchasedFile(strapi,options.userId,options.orderReference,file);
+    if(permission.status!=='available')throw new FileError(permission.status,403);
+    title=permission.title;
+  }
+  const attachment = disposition(title, id, file.mime);
   if (file.storageProvider === 's3') {
     let storage;
     try {
@@ -159,7 +162,7 @@ async function importOriginal(strapi, documentId, source, options) {
     const file = await strapi.db.transaction(async () => {
       const file = await strapi.documents(FILE).create({ data: { wallpaperDocumentId: documentId, storageKey, ...storageFields,
         sha256: crypto.createHash('sha256').update(bytes).digest('hex'), mime, bytes: String(bytes.length),
-        width: image.width, height: image.height, ready: true } });
+        width: image.width, height: image.height, ready: true, testOnly:options.testOnly===true } });
       // Update only media links on both draft/published rows; never publish other draft edits.
       const versions = await strapi.db.query(WALLPAPER).findMany({ where: { documentId }, select: ['id'] });
       for (const version of versions) await strapi.db.query(WALLPAPER).update({ where: { id: version.id }, data: { image: [preview.id] } });

@@ -74,6 +74,7 @@ with tempfile.TemporaryDirectory() as folder:
             cases += [(front, '/api/me', 'POST', 410), (front, '/api/account/profile', 'POST', 410)]
             checkout='/api/checkout/12345678-1234-4234-8234-123456789abc'
             cases += [(front, '/api/checkout/start', 'POST', 200), (front, '/api/payments/yookassa/webhook', 'POST', 200)]
+            cases += [(front, '/api/account/orders?page=1','GET',200), (front,'/api/account/orders','POST',410)]
             cases += [(front, path, method, 200) for path in [checkout, checkout+'/payment'] for method in ['GET','POST']]
             cases += [(front, path, method, 410) for path in ['/api/checkout/start','/api/payments/yookassa/webhook'] for method in ['GET','PUT','DELETE']]
             cases += [(front, path, method, 410) for path in [checkout,checkout+'/payment'] for method in ['PUT','DELETE']]
