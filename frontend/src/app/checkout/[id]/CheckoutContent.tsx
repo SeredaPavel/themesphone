@@ -13,7 +13,7 @@ const labels:Record<ShopOrder['state'],string>={awaiting_payment:'Ожидает
 
 export default function CheckoutContent({paymentsEnabled}:{paymentsEnabled:boolean}) {
   const {id}=useParams<{id:string}>();
-  const {restartCheckout,completeOrder,isReady}=useCart();
+  const {restartCheckout,completeOrder,rememberOrder,isReady}=useCart();
   const [order,setOrder]=useState<ShopOrder|null>(null);
   const [error,setError]=useState('');
   const [loading,setLoading]=useState(true);
@@ -30,6 +30,7 @@ export default function CheckoutContent({paymentsEnabled}:{paymentsEnabled:boole
     return()=>controller.abort();
   },[id,paymentsEnabled]);
   useEffect(()=>{if(order&&isReady)completeOrder(order);},[order,isReady,completeOrder]);
+  useEffect(()=>{if(order?.state==='awaiting_payment'&&isReady)rememberOrder(order.id);},[order,isReady,rememberOrder]);
   async function pay(refresh=false){
     if(pending)return;setPending(true);setError('');
     try{
@@ -49,7 +50,8 @@ export default function CheckoutContent({paymentsEnabled}:{paymentsEnabled:boole
       setOrder(data.order);
     }catch{setError('Не удалось отменить заказ. Попробуйте ещё раз.');}finally{setPending(false);}
   }
-  return <div className="flex justify-center py-8 px-4"><AuthPanel title="Оформление заказа"><AuthStack>
+  const settled=!!order&&['paid','test_paid'].includes(order.state);
+  return <div className="flex justify-center py-8 px-4"><AuthPanel title={settled?'Покупка завершена':'Оформление заказа'}><AuthStack>
     {loading && <p className="auth-copy" role="status">Загружаем заказ…</p>}
     {error && <AuthNotice kind="error">{error}</AuthNotice>}
     {order && <div className="space-y-4">
@@ -68,6 +70,6 @@ export default function CheckoutContent({paymentsEnabled}:{paymentsEnabled:boole
     </div>}
     {login && <Link href="/?auth=popup" className="auth-button auth-button--primary">Войти в аккаунт</Link>}
     {order&&['paid','test_paid'].includes(order.state)&&<Link href="/account#orders" className="auth-button">Мои покупки</Link>}
-    <Link href="/cart" className="auth-button" onClick={()=>{if(order && ['cancelled','expired'].includes(order.state))restartCheckout();}}>{order && ['cancelled','expired'].includes(order.state)?'Оформить заново из корзины':'Вернуться в корзину'}</Link>
+    {!settled&&<Link href="/cart" className="auth-button" onClick={()=>{if(order && ['cancelled','expired'].includes(order.state))restartCheckout();}}>{order && ['cancelled','expired'].includes(order.state)?'Оформить заново из корзины':'Вернуться в корзину'}</Link>}
   </AuthStack></AuthPanel></div>;
 }

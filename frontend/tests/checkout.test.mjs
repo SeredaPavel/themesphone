@@ -2,7 +2,9 @@ import assert from 'node:assert/strict';
 import {test,mock,afterEach} from 'node:test';
 import {randomUUID} from 'node:crypto';
 import {startCheckout,getCheckout,getOrders,cancelCheckout,paymentUnavailable,checkoutPayment,paymentNotification} from '../src/lib/checkout.ts';
-import {normalizeCart,readCart,completeCartOrder} from '../src/lib/cart-storage.ts';
+import {normalizeCart,readCart,completeCartOrder,rememberCartOrder,forgetCartOrder} from '../src/lib/cart-storage.ts';
+import {cartCheckout} from '../src/lib/cart-checkout.ts';
+import {prepareQuickBuy,payQuickBuy,quickBuyStorageKey,readQuickBuyKey} from '../src/lib/quick-buy.ts';
 const originalCms=process.env.STRAPI_API_URL;
 const paymentEnv=Object.fromEntries(['PAYMENTS_ENABLED','PAYMENT_WEBHOOK_BRIDGE_SECRET'].map(key=>[key,process.env[key]]));
 afterEach(()=>{mock.restoreAll();if(originalCms===undefined)delete process.env.STRAPI_API_URL;else process.env.STRAPI_API_URL=originalCms;for(const [key,value] of Object.entries(paymentEnv)){if(value===undefined)delete process.env[key];else process.env[key]=value;}});
@@ -68,6 +70,27 @@ test('reopening a settled order after reload does not remove a newly re-added pr
   assert.equal(completeCartOrder(restored,order,()=>{throw Error('Must not rotate key');}),restored);
   assert.deepEqual(restored.items,[item]);
 });
+
+test('persisted checkouts reconcile on another page and keep products added during payment',()=>{
+  const item={id:1,documentId:id,title:'Обои',price:299,imageUrl:'/preview.jpg'},other={...item,id:2,documentId:'b'.repeat(24)};
+  const pending=rememberCartOrder({version:2,checkoutKey:randomUUID(),items:[item,other]},ref,42);
+  const restored=readCart(JSON.stringify(pending),()=>randomUUID());
+  assert.deepEqual(restored.pendingOrders,[{id:ref,userId:42}]);
+  const result=completeCartOrder(restored,{id:ref,state:'paid',items:[{documentId:id}]},()=>randomUUID());
+  assert.deepEqual(result.items,[other]);assert.deepEqual(result.pendingOrders,[]);
+  assert.equal(rememberCartOrder(result,ref,42),result);
+  assert.equal(forgetCartOrder(result,ref),result);
+});
+
+test('already purchased goods remain visible and contribute nothing to the new checkout',()=>{
+  const item={id:1,documentId:id,title:'Обои',price:299,imageUrl:'/preview.jpg'},other={...item,id:2,documentId:'b'.repeat(24),price:120};
+  for(const status of ['available','download_expired','file_unavailable']){
+    const purchases={[id]:{documentId:id,orderId:ref,download:{status,expiresAt:null}}};
+    assert.deepEqual(cartCheckout([item,other],purchases),{unpaid:[other],total:120});
+    assert.deepEqual(cartCheckout([item],purchases),{unpaid:[],total:0});
+  }
+  assert.deepEqual(cartCheckout([item],{}),{unpaid:[item],total:299});
+});
 test('payment BFF passes the session and stored order ID only, rejects forged redirects and financial input',async()=>{
   process.env.STRAPI_API_URL='http://cms:1337';process.env.PAYMENTS_ENABLED='true';
   const payment={state:'pending',test:true,confirmationUrl:'https://yoomoney.ru/api-pages/v2/payment-confirm/epl?orderId=fixture'};
@@ -103,4 +126,48 @@ test('history uses only the current session, bounds pages and strips private ori
   const request=url=>new Request(url,{headers:{Cookie:'token=user.session.jwt'}});
   const result=await getOrders(request('https://shop.example/api/account/orders?page=2'));assert.equal(result.status,200);assert.deepEqual(await result.json(),{orders:[expected],hasMore:false});
   for(const query of ['page=0','page=1&page=2','page=10000','owner=99','populate=*'])assert.equal((await getOrders(request('https://shop.example/api/account/orders?'+query))).status,400);
+});
+
+test('cart purchase lookup is scoped to selected IDs and the current user, and strips private fields',async()=>{
+  process.env.STRAPI_API_URL='http://cms:1337';
+  const key=randomUUID(),download={status:'available',fileId:'file123',expiresAt:null};
+  const req=query=>new Request('https://shop.example/api/account/orders?'+query,{headers:{Cookie:'token=user.session.jwt'}});
+  mock.method(globalThis,'fetch',async(url,options)=>{
+    const query=new URL(url).searchParams;assert.equal(query.get('items'),id);assert.equal(query.get('checkoutKey'),key);
+    assert.equal(options.headers.Authorization,'Bearer user.session.jwt');
+    return Response.json({purchases:[{documentId:id,orderId:ref,download:{...download,storageKey:'secret'},owner:99}],checkoutOrder:null});
+  });
+  const result=await getOrders(req(new URLSearchParams({items:id,checkoutKey:key})));assert.equal(result.status,200);
+  assert.deepEqual(await result.json(),{purchases:[{documentId:id,orderId:ref,download}],checkoutOrder:null});
+  for(const query of ['items='+id,'items='+id+'&checkoutKey=bad','items='+id+','+id+'&checkoutKey='+key,'items='+id+'&checkoutKey='+key+'&page=1','items='+id+'&checkoutKey='+key+'&owner=99'])assert.equal((await getOrders(req(query))).status,400);
+});
+
+test('buy now creates only the selected product and reuses a user-scoped retry key',async()=>{
+  const key=randomUUID(),calls=[];
+  assert.notEqual(quickBuyStorageKey(1,id),quickBuyStorageKey(2,id));
+  assert.equal(readQuickBuyKey(key,()=>{throw Error('Must reuse key')}),key);
+  assert.equal(readQuickBuyKey('broken',()=>key),key);
+  mock.method(globalThis,'fetch',async(url,options)=>{
+    calls.push(url);
+    if(url.startsWith('/api/account/orders?'))return Response.json({purchases:[],checkoutOrder:null});
+    assert.equal(url,'/api/checkout/start');assert.deepEqual(JSON.parse(options.body),{items:[id],checkoutKey:key});
+    return Response.json({order:order()});
+  });
+  const result=await prepareQuickBuy(id,key,new AbortController().signal);assert.equal(result.order.id,ref);assert.equal(calls.length,2);
+});
+
+test('buy now shows an existing purchase without creating another order or payment',async()=>{
+  const purchase={documentId:id,orderId:ref,download:{status:'available',fileId:'file123',expiresAt:null}};
+  const fetch=mock.method(globalThis,'fetch',async()=>Response.json({purchases:[purchase],checkoutOrder:null}));
+  const result=await prepareQuickBuy(id,randomUUID(),new AbortController().signal);assert.deepEqual(result,{order:null,purchase});assert.equal(fetch.mock.callCount(),1);
+});
+
+test('buy now pays the stored server order and rejects a foreign provider redirect',async()=>{
+  mock.method(globalThis,'fetch',async(url,options)=>{
+    assert.equal(url,'/api/checkout/'+ref+'/payment');assert.deepEqual(JSON.parse(options.body),{});
+    return Response.json({order:order(),payment:{confirmationUrl:'https://yoomoney.ru/api-pages/v2/payment-confirm/epl?orderId=fixture'}});
+  });
+  assert.match((await payQuickBuy(ref,new AbortController().signal)).href,/^https:\/\/yoomoney.ru\//);
+  mock.restoreAll();mock.method(globalThis,'fetch',async()=>Response.json({order:order(),payment:{confirmationUrl:'https://evil.example/payment'}}));
+  await assert.rejects(payQuickBuy(ref,new AbortController().signal));
 });

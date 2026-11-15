@@ -5,6 +5,7 @@ export type ShopOrder = {
   items:{documentId:string; title:string; unitKopecks:number; quantity:1; download?:OrderDownload}[];
 };
 export type OrderDownload={status:'available'|'payment_required'|'test_purchase'|'download_expired'|'file_unavailable'|'access_revoked';fileId?:string;expiresAt:string|null};
+export type CartPurchase={documentId:string;orderId:string;download:OrderDownload};
 const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const documentId=/^[a-z0-9]{24}$/;
 const messages:Record<string,string>={
@@ -21,6 +22,7 @@ const messages:Record<string,string>={
   payment_busy:'ЮKassa обрабатывает запрос. Повторите немного позже.',order_not_payable:'Заказ уже закрыт или срок оформления истёк.',
   payment_review_required:'Статус платежа требует проверки. Новый платёж по этому заказу не создаётся.',
   payment_in_progress:'Оплата уже начата. Отмена доступна на странице ЮKassa.',
+  already_purchased:'Эти обои уже оплачены. Они доступны в разделе «Мои покупки».',
 };
 const json=(data:unknown,status=200)=>Response.json(data,{status,headers:{'Cache-Control':'no-store'}});
 function sameOrigin(req:Request) {
@@ -34,6 +36,12 @@ function session(req:Request) {
     return /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(token)?token:null;
   }catch{return null;}
 }
+function safeDownload(d:any):OrderDownload {
+  if(!d||!['available','payment_required','test_purchase','download_expired','file_unavailable','access_revoked'].includes(d.status)||
+    (d.expiresAt!==null&&(typeof d.expiresAt!=='string'||!Number.isFinite(Date.parse(d.expiresAt))))||
+    (d.status==='available'&&(typeof d.fileId!=='string'||!/^[a-zA-Z0-9]{1,64}$/.test(d.fileId))))throw Error('Invalid download');
+  return {status:d.status,expiresAt:d.expiresAt,...(d.status==='available'?{fileId:d.fileId}:{})};
+}
 function safeOrder(value:any):ShopOrder {
   if(!value || typeof value.id!=='string' || !uuid.test(value.id) || value.currency!=='RUB' || !Number.isSafeInteger(value.totalKopecks) || value.totalKopecks<=0 ||
     !['awaiting_payment','cancelled','expired','test_paid','paid'].includes(value.state) || !Number.isFinite(Date.parse(value.createdAt)) || !Number.isFinite(Date.parse(value.expiresAt)) ||
@@ -42,11 +50,7 @@ function safeOrder(value:any):ShopOrder {
     if(!item || !documentId.test(item.documentId) || typeof item.title!=='string' || item.title.length>300 || item.quantity!==1 || !Number.isSafeInteger(item.unitKopecks) || item.unitKopecks<=0)throw Error('Invalid item');
     let download:OrderDownload|undefined;
     if(item.download!==undefined){
-      const d=item.download;
-      if(!d||!['available','payment_required','test_purchase','download_expired','file_unavailable','access_revoked'].includes(d.status)||
-        (d.expiresAt!==null&&(typeof d.expiresAt!=='string'||!Number.isFinite(Date.parse(d.expiresAt))))||
-        (d.status==='available'&&(typeof d.fileId!=='string'||!/^[a-zA-Z0-9]{1,64}$/.test(d.fileId))))throw Error('Invalid download');
-      download={status:d.status,expiresAt:d.expiresAt,...(d.status==='available'?{fileId:d.fileId}:{})};
+      download=safeDownload(item.download);
     }
     return {documentId:item.documentId,title:item.title,quantity:1 as const,unitKopecks:item.unitKopecks,...(download?{download}:{})};
   });
@@ -65,7 +69,7 @@ function safePayment(value:any){
   }
   return {state:value.state as string,test:true as const,confirmationUrl};
 }
-async function cms(req:Request,route:string,method='GET',data?:unknown,payment=false,list=false) {
+async function cms(req:Request,route:string,method='GET',data?:unknown,payment=false,list:boolean|'cart'=false) {
   const token=session(req);
   if(!token)return json({error:messages.login_required},401);
   try {
@@ -79,6 +83,16 @@ async function cms(req:Request,route:string,method='GET',data?:unknown,payment=f
       const status=[400,401,403,404,409,429].includes(response.status)?response.status:503;
       const code=status===401?'login_required':status===404?'order_not_found':value?.error;
       return json({error:messages[code]||messages.orders_unavailable},status);
+    }
+    if(list==='cart'){
+      if(!value||!Array.isArray(value.purchases)||value.purchases.length>30||new Set(value.purchases.map((p:any)=>p?.documentId)).size!==value.purchases.length)throw Error();
+      const purchases:CartPurchase[]=value.purchases.map((p:any)=>{
+        if(!p||typeof p.documentId!=='string'||!documentId.test(p.documentId)||typeof p.orderId!=='string'||!uuid.test(p.orderId))throw Error();
+        return {documentId:p.documentId,orderId:p.orderId,download:safeDownload(p.download)};
+      });
+      const checkoutOrder=value.checkoutOrder===null?null:safeOrder(value.checkoutOrder);
+      if(checkoutOrder&&!['paid','test_paid'].includes(checkoutOrder.state))throw Error();
+      return json({purchases,checkoutOrder});
     }
     if(list){if(!value||!Array.isArray(value.orders)||value.orders.length>20||typeof value.hasMore!=='boolean')throw Error();return json({orders:value.orders.map(safeOrder),hasMore:value.hasMore});}
     return payment?json({order:safeOrder(value.order),payment:safePayment(value.payment)}):json({order:safeOrder(value)});
@@ -102,6 +116,12 @@ export async function getCheckout(req:Request,id:string) {
 }
 export async function getOrders(req:Request){
   const query=new URL(req.url).searchParams;
+  if(query.has('items')){
+    const items=(query.get('items')||'').split(','),key=query.get('checkoutKey')||'';
+    if(Array.from(query.keys()).some(key=>!['items','checkoutKey'].includes(key)||query.getAll(key).length!==1)||
+      items.length>30||items.some(id=>!documentId.test(id))||new Set(items).size!==items.length||!uuid.test(key))return json({error:messages.invalid_order},400);
+    return cms(req,'shop-orders?'+new URLSearchParams({items:items.join(','),checkoutKey:key}),'GET',undefined,false,'cart');
+  }
   const page=query.get('page')||'1';
   if(Array.from(query.keys()).some(key=>key!=='page'||query.getAll(key).length!==1)||!/^[1-9]\d{0,3}$/.test(page))return json({error:messages.invalid_page},400);
   return cms(req,'shop-orders?page='+page,'GET',undefined,false,true);

@@ -16,7 +16,7 @@ async function main(){
   const env=requireBackend('dotenv').parse(fs.readFileSync(envPath));
   if(env.DATABASE_NAME!=='themesphone_auth_dev'||env.DATABASE_HOST!=='127.0.0.1'||env.DATABASE_PORT!=='5434'||env.NODE_ENV!=='development')throw Error('Refusing non-isolated database');
   Object.assign(process.env,env,{ENV_PATH:envPath,HOST:'127.0.0.1',PORT:'1342',DOCUMENTATION_ENABLED:'false',
-    AUTH_CONFIGURE_EMAIL:'false',OAUTH_ENABLED:'false',ORDERS_ENABLED:'true',PAYMENTS_ENABLED:'false',
+    AUTH_CONFIGURE_EMAIL:'false',OAUTH_ENABLED:'false',ORDERS_ENABLED:'true',PAYMENTS_ENABLED:'false',YOOKASSA_MODE:'test',
     SMTP_HOST:'127.0.0.1',SMTP_PORT:'1026',SMTP_SECURE:'false',STRAPI_TELEMETRY_DISABLED:'true',DATABASE_POOL_MIN:'0',DATABASE_POOL_MAX:'5'});
   for(const key of ['DATABASE_URL','SMTP_USER','SMTP_PASS'])delete process.env[key];
   phase='database snapshot';
@@ -120,7 +120,9 @@ async function main(){
       if(loseResponse){loseResponse=false;throw new PaymentError('payment_provider_unavailable');}return structuredClone(value);
     },get:async id=>structuredClone(byId.get(id))};
     const checkout=createPayments(app,{config:cfg,api:fake});
-    const paymentOrder=await createOrders(app).create(owner.id,input());
+    const paymentRequest=input();
+    const paymentOrder=await createOrders(app).create(owner.id,paymentRequest);
+    const staleOrder=await createOrders(app).create(owner.id,input());
     await assert.rejects(checkout.start(other.id,paymentOrder.id),error=>error.code==='order_not_found');assert.equal(byKey.size,0);
     await assert.rejects(checkout.start(owner.id,paymentOrder.id),error=>error.code==='payment_provider_unavailable');
     await assert.rejects(createOrders(app).cancel(owner.id,paymentOrder.id),error=>error.code==='payment_in_progress');
@@ -137,7 +139,20 @@ async function main(){
     await Promise.all([checkout.webhook(notification),checkout.webhook(notification)]);
     assert.equal((await createOrders(app).findOne(owner.id,paymentOrder.id)).state,'test_paid');
     const success=await checkout.refresh(owner.id,paymentOrder.id);assert.equal(success.payment.test,true);assert.equal(success.order.state,'test_paid');
-    const cancelOrder=await createOrders(app).create(owner.id,input());await checkout.start(owner.id,cancelOrder.id);
+    phase='purchased products are excluded from both UI lookup and server totals';
+    const owned=await createOrders(app).cart(owner.id,paid.documentId,paymentRequest.checkoutKey);
+    assert.equal(owned.checkoutOrder.id,paymentOrder.id);assert.equal(owned.purchases[0].documentId,paid.documentId);
+    assert.deepEqual((await createOrders(app).cart(other.id,paid.documentId,paymentRequest.checkoutKey)).purchases,[]);
+    assert.equal((await createOrders(app).cart(other.id,paid.documentId,paymentRequest.checkoutKey)).checkoutOrder,null);
+    await assert.rejects(createOrders(app).create(owner.id,input()),error=>error.code==='already_purchased');
+    await assert.rejects(checkout.start(owner.id,staleOrder.id),error=>error.code==='already_purchased');
+    const mixedRequest=input([paid.documentId,second.documentId]);
+    const mixed=await createOrders(app).create(owner.id,mixedRequest);
+    assert.equal(mixed.totalKopecks,12000);assert.deepEqual(mixed.items.map(item=>item.documentId),[second.documentId]);
+    assert.equal((await createOrders(app).create(owner.id,mixedRequest)).id,mixed.id);
+    const cartView=await bff.getOrders(new Request('http://127.0.0.1:3100/api/account/orders?'+new URLSearchParams({items:paid.documentId,checkoutKey:paymentRequest.checkoutKey}),{headers:{Cookie:'token='+tokens.get(owner.id)}}));
+    assert.equal(cartView.status,200);assert.equal((await cartView.json()).purchases[0].documentId,paid.documentId);
+    const cancelOrder=await createOrders(app).create(owner.id,input([second.documentId]));await checkout.start(owner.id,cancelOrder.id);
     const last=[...byId.values()].at(-1);last.status='canceled';
     await checkout.webhook({type:'notification',event:'payment.canceled',object:{id:last.id}});
     assert.equal((await createOrders(app).findOne(owner.id,cancelOrder.id)).state,'cancelled');
@@ -160,6 +175,9 @@ async function main(){
     const paymentRaw=[...byId.values()].at(-1);paymentRaw.status='succeeded';paymentRaw.paid=true;
     await checkout.webhook({type:'notification',event:'payment.succeeded',object:{id:paymentRaw.id}});
     const granted=await createOrders(app).findOne(downloadUser.id,downloadOrder.id);assert.equal(granted.items[0].download.status,'available');
+    for(let index=0;index<22;index++)await app.db.query(ORDER).create({data:{reference:crypto.randomUUID(),checkoutKey:crypto.randomUUID(),requestHash:tag,owner:downloadUser.id,items:[{documentId:second.documentId,title:'History fixture',unitKopecks:12000,quantity:1}],totalKopecks:'12000',currency:'RUB',state:'cancelled',expiresAt:new Date(Date.now()+3600000)}});
+    assert.ok(!(await createOrders(app).list(downloadUser.id)).orders.some(row=>row.id===downloadOrder.id));
+    assert.equal((await createOrders(app).cart(downloadUser.id,downloadable.documentId,crypto.randomUUID())).purchases[0].orderId,downloadOrder.id);
     const {download}=await import(pathToFileURL(path.join(root,'frontend/src/lib/download.ts')).href);
     function requestFile(userId,reference=downloadOrder.id){return new Request('http://127.0.0.1:3100/api/download?'+new URLSearchParams({file:asset.id,order:reference}),{headers:userId?{Cookie:'token='+tokens.get(userId)}:{}});}
     assert.equal((await download(requestFile(other.id))).status,403);
@@ -168,6 +186,19 @@ async function main(){
     for(let repeat=0;repeat<2;repeat++){
       const response=await download(requestFile(downloadUser.id));assert.equal(response.status,200);assert.ok(Buffer.from(await response.arrayBuffer()).equals(original));
     }
+    phase='buy-now order, test-only availability and purchase history';
+    process.env.PAYMENTS_ENABLED='true';
+    try{
+      const display=await require('../backend/src/lib/wallpaper-files').withOriginalFiles(app,[{documentId:paid.documentId,isFree:false},{documentId:downloadable.documentId,isFree:false}]);
+      assert.deepEqual(display.map(item=>item.purchaseAvailable),[false,true]);
+      await assert.rejects(createOrders(app).create(other.id,input([paid.documentId])),error=>error.code==='product_unavailable');
+      const direct=await bff.startCheckout(new Request('http://127.0.0.1:3100/api/checkout/start',{method:'POST',headers:{Origin:'http://127.0.0.1:3100',Cookie:'token='+tokens.get(other.id)},body:JSON.stringify(input([downloadable.documentId]))}));
+      assert.equal(direct.status,200);const quick=(await direct.json()).order;assert.equal(quick.items.length,1);assert.equal(quick.items[0].documentId,downloadable.documentId);
+      await checkout.start(other.id,quick.id);const quickPayment=[...byId.values()].at(-1);quickPayment.status='succeeded';quickPayment.paid=true;
+      await checkout.webhook({type:'notification',event:'payment.succeeded',object:{id:quickPayment.id}});
+      const history=await createOrders(app).list(other.id);assert.equal(history.orders.find(row=>row.id===quick.id).items[0].download.status,'available');
+      const bytes=await download(requestFile(other.id,quick.id));assert.equal(bytes.status,200);assert.ok(Buffer.from(await bytes.arrayBuffer()).equals(original));
+    }finally{process.env.PAYMENTS_ENABLED='false';}
     await app.documents(WALLPAPER).unpublish({documentId:downloadable.documentId});
     const afterUnpublish=await download(requestFile(downloadUser.id));assert.equal(afterUnpublish.status,200);await afterUnpublish.arrayBuffer();
     const extraIdentity=await app.db.query(IDENTITY).create({data:{key:tag+'-download-identity',provider:'telegram',subject:tag+'-download',user:downloadUser.id}});identities.push(extraIdentity.id);
@@ -180,6 +211,8 @@ async function main(){
     await app.db.query(ORDER).update({where:{id:row.id},data:{downloadDays:1,paidAt:new Date(Date.now()-2*86400000)}});
     const expired=await download(requestFile(owner.id));assert.equal(expired.status,403);assert.equal((await expired.json()).error,'download_expired');
     assert.equal((await createOrders(app).findOne(owner.id,downloadOrder.id)).items[0].download.status,'download_expired');
+    assert.equal((await createOrders(app).cart(owner.id,downloadable.documentId,crypto.randomUUID())).purchases[0].download.status,'download_expired');
+    await assert.rejects(createOrders(app).create(owner.id,input([downloadable.documentId])),error=>error.code==='already_purchased');
     phase='disabled flag and paid downloads remain closed';
     process.env.ORDERS_ENABLED='false';assert.equal((await http('POST','shop-orders',input())).status,503);
     assert.equal((await http('GET','shop-orders/'+oauthOrder.id)).status,200);

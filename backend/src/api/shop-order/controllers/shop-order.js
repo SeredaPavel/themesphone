@@ -22,6 +22,10 @@ module.exports = ({ strapi }) => {
       return orders.findOne(id, ctx.params.id);
     }),
     list: handle((ctx, id) => {
+      if(ctx.query.items!==undefined){
+        if(Object.keys(ctx.query).some(key=>!['items','checkoutKey'].includes(key)))throw new OrderError('invalid_order');
+        return orders.cart(id,ctx.query.items,ctx.query.checkoutKey);
+      }
       if (Object.keys(ctx.query).some(key => key !== 'page')) throw new OrderError('invalid_page');
       return orders.list(id, ctx.query.page);
     }),

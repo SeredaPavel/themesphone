@@ -6,6 +6,7 @@ import { safeCatalogReturn, wallpaperDetailHref } from '@/lib/catalog-query';
 import CommerceNotice from '@/components/CommerceNotice';
 import DownloadLink from '@/components/DownloadLink';
 import { validOriginal, originalDescription } from '@/lib/download-links';
+import BuyButton from '@/components/BuyButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -80,7 +81,7 @@ export default async function WallpaperDetailPage({ params, searchParams }: {
       </div>
       {wallpaper.isFree === true && original
         ? <DownloadLink file={original} wallpaper={wallpaper.documentId} returnTo={returnTo} className="liquid-pill" />
-        : <CommerceNotice action={wallpaper.isFree ? 'download' : 'product'} />}
+        :wallpaper.isFree?<CommerceNotice action="download"/>:<div className="space-y-3"><BuyButton documentId={wallpaper.documentId} title={wallpaper.title} available={wallpaper.purchaseAvailable===true}/>{!wallpaper.purchaseAvailable&&<CommerceNotice action="product"/>}</div>}
     </article>
   );
 }

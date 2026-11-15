@@ -4,7 +4,7 @@ import Link from 'next/link';
 import {useEffect,useId,useState} from 'react';
 import type {MouseEvent} from 'react';
 import {useRouter} from 'next/navigation';
-import {ArrowUpRight,Check,Download,ShoppingBag,ShoppingCart} from 'lucide-react';
+import {ArrowUpRight,Check,Download,ShoppingCart} from 'lucide-react';
 import {useCart} from '@/context/CartContext';
 import {useAuthContext} from '@/context/AuthContext';
 import {wallpaperDetailHref} from '@/lib/catalog-query';
@@ -18,10 +18,11 @@ import {useWallpaperPreview} from './WallpaperPreviewGroup';
 import type {PhoneDevice} from './PhoneFrame';
 import {commerceMessages} from './CommerceNotice';
 import styles from './WallpaperCard.module.css';
+import BuyButton from './BuyButton';
 
-type Props={id:number;documentId?:string;returnTo?:string;title:string;imageUrl:string;isFree:boolean|null;price?:number;device?:{title:string;slug:string}|null;category?:{title:string;slug:string}|null;compact?:boolean;originalFile?:OriginalFile|null};
+type Props={id:number;documentId?:string;returnTo?:string;title:string;imageUrl:string;isFree:boolean|null;price?:number;device?:{title:string;slug:string}|null;category?:{title:string;slug:string}|null;compact?:boolean;originalFile?:OriginalFile|null;purchaseAvailable?:boolean};
 
-export default function WallpaperCard({id,documentId,returnTo,title,imageUrl,isFree,price,device,category,compact=false,originalFile}:Props) {
+export default function WallpaperCard({id,documentId,returnTo,title,imageUrl,isFree,price,device,category,compact=false,originalFile,purchaseAvailable=false}:Props) {
   const [hovered,setHovered]=useState(false);
   const [keyboardFocus,setKeyboardFocus]=useState(false);
   const [added,setAdded]=useState(false);
@@ -68,11 +69,11 @@ export default function WallpaperCard({id,documentId,returnTo,title,imageUrl,isF
             {isFree===true?(validOriginal(originalFile) && documentId
               ?<DownloadLink file={originalFile} wallpaper={documentId} returnTo={returnTo} tabIndex={expanded?0:-1} />
               :<button type="button" disabled title={commerceMessages.download} aria-describedby={availabilityId}><Download size={13} />Загрузить <small>скоро</small></button>):<>
-              <button type="button" disabled title={commerceMessages.purchase} aria-describedby={availabilityId} className={styles.buy}><ShoppingBag size={13} />Купить <small>скоро</small></button>
+              <BuyButton documentId={documentId||''} title={title} available={purchaseAvailable} tabIndex={expanded?0:-1} className={styles.buy}/>
               <button type="button" onClick={add} tabIndex={expanded?0:-1} aria-label={added?`Добавлено: ${title}`:`В корзину: ${title}`} className={added?styles.added:''}>{added?<Check size={13} />:<ShoppingCart size={13} />}{added?'Добавлено':'В корзину'}</button>
             </>}
           </div>
-          <span className="sr-only" id={availabilityId}>{commerceMessages[isFree?'download':'purchase']}</span>
+          <span className="sr-only" id={availabilityId}>{purchaseAvailable?'Оплатите сразу или добавьте товар в корзину.':commerceMessages[isFree?'download':'purchase']}</span>
         </>}
       </PhoneFrame>
       {compact && <h3 className={styles.compactTitle}><Link href={detailUrl} onClick={rememberPosition}>{title}</Link></h3>}

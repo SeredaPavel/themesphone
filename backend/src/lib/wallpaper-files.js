@@ -72,8 +72,11 @@ async function withOriginalFiles(strapi, data) {
   const ids = items.map(item => item.documentId).filter(id => typeof id === 'string' && ID.test(id));
   if (!ids.length) return data;
   const files = await strapi.db.query(FILE).findMany({ where: { wallpaperDocumentId: { $in: ids }, ready: true } });
-  const byWallpaper = new Map(files.map(file => [file.wallpaperDocumentId, metadata(file)]));
-  const append = item => ({ ...item, originalFile: byWallpaper.get(item.documentId) || null });
+  const byWallpaper = new Map(files.map(file => [file.wallpaperDocumentId, file]));
+  const append = item => {
+    const file=byWallpaper.get(item.documentId),originalFile=metadata(file);
+    return {...item,originalFile,purchaseAvailable:item.isFree===false&&!!originalFile&&process.env.ORDERS_ENABLED==='true'&&process.env.PAYMENTS_ENABLED==='true'&&process.env.YOOKASSA_MODE==='test'&&file.testOnly===true};
+  };
   return Array.isArray(data) ? data.map(append) : append(data);
 }
 

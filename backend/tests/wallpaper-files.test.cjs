@@ -79,6 +79,19 @@ test('public metadata never contains storage keys, checksums or filesystem paths
   assert.doesNotMatch(JSON.stringify(result), /storageKey|sha256|secret-digest/);
 });
 
+test('buy is available only for a prepared test product while test payments are active',async()=>{
+  const keys=['ORDERS_ENABLED','PAYMENTS_ENABLED','YOOKASSA_MODE'],before=Object.fromEntries(keys.map(key=>[key,process.env[key]]));
+  try{
+    Object.assign(process.env,{ORDERS_ENABLED:'true',PAYMENTS_ENABLED:'true',YOOKASSA_MODE:'test'});
+    const product={documentId:asset.wallpaperDocumentId,title:'Тестовый товар',isFree:false};
+    const run=async file=>(await files.withOriginalFiles({db:{query:()=>({findMany:async()=>file?[file]:[]})}},[product]))[0];
+    assert.equal((await run({...asset,testOnly:true})).purchaseAvailable,true);
+    assert.equal((await run({...asset,testOnly:false})).purchaseAvailable,false);
+    assert.equal((await run(null)).purchaseAvailable,false);
+    process.env.PAYMENTS_ENABLED='false';assert.equal((await run({...asset,testOnly:true})).purchaseAvailable,false);
+  }finally{for(const key of keys)if(before[key]===undefined)delete process.env[key];else process.env[key]=before[key]}
+});
+
 test('import keeps original bytes private and sends only a resized preview to Strapi', async () => {
   const source = path.join(root, 'source.jpg');
   const original = await sharp({ create: { width: 736, height: 1449, channels: 3, background: '#17616a' } }).jpeg().toBuffer();

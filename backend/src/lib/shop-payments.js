@@ -58,11 +58,16 @@ function createPayments(strapi,options={}){
       if(!(cfg.allowedOrigins||[cfg.origin]).includes(origin))throw new PaymentError('invalid_payment_origin',400);
       const attempt=await owned(userId,reference,async row=>{
         const existing=await payments().findOne({where:{orderReference:reference}});
+        if(row.state==='awaiting_payment'&&(await require('./order-downloads').purchasesForUser(strapi,userId,row.items.map(item=>item.documentId),undefined,{exceptOrder:reference})).length)throw new OrderError('already_purchased',409);
         if(existing){
           if(existing.shopId!==cfg.shopId||existing.mode!==cfg.mode)throw new PaymentError('payments_unavailable');
           return existing;
         }
         if(row.state!=='awaiting_payment'||new Date(row.expiresAt).getTime()<=Date.now())throw new PaymentError('order_not_payable',409);
+        if(process.env.PAYMENTS_ENABLED==='true'&&cfg.mode==='test'){
+          const files=await strapi.db.query('api::wallpaper-file.wallpaper-file').findMany({where:{documentId:{$in:row.items.map(item=>item.originalFileId)},ready:true,testOnly:true}});
+          if(row.items.some(item=>!files.some(file=>file.documentId===item.originalFileId&&file.wallpaperDocumentId===item.documentId)))throw new OrderError('product_unavailable',409);
+        }
         const attemptId=randomUUID();
         const requestBody={amount:{value:amount(Number(row.totalKopecks)),currency:'RUB'},capture:true,
           confirmation:{type:'redirect',return_url:origin+'/checkout/'+row.reference},

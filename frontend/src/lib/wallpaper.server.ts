@@ -26,6 +26,7 @@ export type Wallpaper = {
   categories?: { title: string; slug: string }[];
   device?: { title: string; slug: string } | null;
   originalFile?: OriginalFile | null;
+  purchaseAvailable?: boolean;
 };
 
 // Only server components import this module: Docker DNS stays on the server.

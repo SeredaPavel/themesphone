@@ -2,7 +2,7 @@
 
 const { createHash, randomUUID } = require('node:crypto');
 const { FILE, WALLPAPER, metadata } = require('./wallpaper-files');
-const {downloadDaysSetting,presentOrders}=require('./order-downloads');
+const {downloadDaysSetting,presentOrders,purchasesForUser,verifiedPaymentMode}=require('./order-downloads');
 const ORDER = 'api::shop-order.shop-order';
 const USER = 'plugin::users-permissions.user';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
@@ -49,22 +49,27 @@ function createOrders(strapi) {
     async create(userId, raw) {
       if (process.env.ORDERS_ENABLED !== 'true') throw new OrderError('orders_unavailable', 503);
       const input = inputOrder(raw);
-      return withOwner(strapi, userId, async () => {
+      return withOwner(strapi, userId, async (_user,trx) => {
         const checkoutKey = hash(userId + ':' + input.checkoutKey);
         const existing = await query().findOne({ where: { checkoutKey, owner: { id: userId } } });
         if (existing) {
           if (existing.requestHash !== input.requestHash) throw new OrderError('checkout_conflict', 409);
+          if(existing.state==='awaiting_payment'&&(await purchasesForUser(strapi,userId,existing.items.map(item=>item.documentId),trx,{exceptOrder:existing.reference})).length)throw new OrderError('checkout_conflict',409);
           return publicOrder(existing);
         }
+        const purchased=new Set((await purchasesForUser(strapi,userId,input.items,trx)).map(item=>item.documentId));
+        const unpaid=input.items.filter(id=>!purchased.has(id));
+        if(!unpaid.length)throw new OrderError('already_purchased',409);
         if (await query().count({ where: { owner: { id: userId }, state: 'awaiting_payment', expiresAt: { $gt: new Date() } } }) >= 20) throw new OrderError('too_many_orders', 429);
         const products = await strapi.documents(WALLPAPER).findMany({
-          status: 'published', filters: { documentId: { $in: input.items } }, fields: ['documentId', 'title', 'price', 'isFree'], limit: MAX_ITEMS,
+          status: 'published', filters: { documentId: { $in: unpaid } }, fields: ['documentId', 'title', 'price', 'isFree'], limit: MAX_ITEMS,
         });
-        const files = await strapi.db.query(FILE).findMany({ where: { wallpaperDocumentId: { $in: input.items }, ready: true } });
-        const items = input.items.map(id => {
+        const files = await strapi.db.query(FILE).findMany({ where: { wallpaperDocumentId: { $in: unpaid }, ready: true } });
+        const items = unpaid.map(id => {
           const product = products.find(row => row.documentId === id);
           const original = files.find(file => file.wallpaperDocumentId === id);
           if (!product || product.isFree !== false || !metadata(original) || typeof product.title !== 'string' || !product.title.trim()) throw new OrderError('product_unavailable', 409);
+          if(process.env.PAYMENTS_ENABLED==='true'&&process.env.YOOKASSA_MODE==='test'&&original.testOnly!==true)throw new OrderError('product_unavailable',409);
           return { documentId: id, title: product.title.slice(0, 300), unitKopecks: priceKopecks(product.price), quantity: 1, originalFileId: original.documentId };
         });
         const totalKopecks = items.reduce((sum, item) => sum + item.unitKopecks, 0);
@@ -76,6 +81,19 @@ function createOrders(strapi) {
           downloadDays:downloadDaysSetting(),
         } });
         return publicOrder(row);
+      });
+    },
+    async cart(userId,rawItems,checkoutKey){
+      if(typeof rawItems!=='string'||rawItems.length>749||typeof checkoutKey!=='string'||!UUID.test(checkoutKey))throw new OrderError('invalid_order');
+      const ids=rawItems.split(',');
+      if(!ids.length||ids.length>MAX_ITEMS||ids.some(id=>!DOCUMENT.test(id))||new Set(ids).size!==ids.length)throw new OrderError('invalid_order');
+      return withOwner(strapi,userId,async(_user,trx)=>{
+        const purchases=await purchasesForUser(strapi,userId,ids,trx);
+        const row=await query().findOne({where:{checkoutKey:hash(userId+':'+checkoutKey),owner:{id:userId},state:{$in:['paid','test_paid']}}});
+        const payment=row?await strapi.db.query('api::shop-payment.shop-payment').findOne({where:{orderReference:row.reference}}):null;
+        const mode=row?verifiedPaymentMode(row,payment):null;
+        const completed=mode&&payment.refunded!==true&&(mode==='live'||process.env.YOOKASSA_MODE==='test');
+        return {purchases,checkoutOrder:completed?(await presentOrders(strapi,[row]))[0]:null};
       });
     },
     async findOne(userId, id) {

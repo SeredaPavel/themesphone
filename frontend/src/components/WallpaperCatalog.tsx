@@ -39,6 +39,7 @@ export default async function WallpaperCatalog({ searchParams, category, device 
             const price = Number(wallpaper.price);
             return <WallpaperCard key={wallpaper.documentId} id={wallpaper.id} documentId={wallpaper.documentId}
               returnTo={returnTo} originalFile={wallpaper.originalFile}
+              purchaseAvailable={wallpaper.purchaseAvailable===true}
               title={wallpaper.title} imageUrl={imageUrl} isFree={wallpaper.isFree}
               price={Number.isFinite(price) && price >= 0 ? price : undefined}
               category={wallpaper.categories?.[0] || null} device={wallpaper.device || null} />;

@@ -10,15 +10,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="ru">
       <body>
-        <CartProvider>
-          <AuthProvider>
+        <AuthProvider>
+          <CartProvider>
             <Suspense fallback={null}>
               <Header />
             </Suspense>
             <main>{children}</main>
             <SocialButtons />
-          </AuthProvider>
-        </CartProvider>
+          </CartProvider>
+        </AuthProvider>
       </body>
     </html>
   )
