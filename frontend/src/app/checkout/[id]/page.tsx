@@ -1,117 +1,58 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import {useEffect,useState} from 'react';
 import Link from 'next/link';
-import { useParams, useSearchParams, useRouter } from 'next/navigation';
-import PaymentPopup from '@/components/PaymentPopup';
-import DownloadPopup from '@/components/DownloadPopup';
-import CommerceNotice from '@/components/CommerceNotice';
+import {useParams} from 'next/navigation';
+import AuthPanel,{AuthStack,AuthNotice} from '@/components/auth/AuthSurface';
+import {PaymentMethods} from '@/components/PaymentPopup';
+import type {ShopOrder} from '@/lib/checkout';
+import {useCart} from '@/context/CartContext';
+const money=(kopecks:number)=>(kopecks/100).toLocaleString('ru-RU',{style:'currency',currency:'RUB'});
+const labels:Record<ShopOrder['state'],string>={awaiting_payment:'Ожидает оплаты',cancelled:'Заказ отменён',expired:'Срок заказа истёк',paid:'Оплачен'};
 
-// Заготовка остаётся для этапа серверных заказов и оплаты; пока не монтируется.
-function LegacyCheckoutContent() {
-  const { id } = useParams();
-  const searchParams = useSearchParams();
-  const router = useRouter();
-
-  const [order, setOrder] = useState<any>(null);
-  const [showPaymentPopup, setShowPaymentPopup] = useState(false);
-  const [showDownloadPopup, setShowDownloadPopup] = useState(false);
-
-  const from = searchParams.get('from');
-
-  // Загружаем заказ
-  useEffect(() => {
-    async function fetchOrder() {
-      try {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_STRAPI_URL}/api/orders/${id}?populate=wallpapers`, {
-          headers: {
-            Authorization: `Bearer ${process.env.STRAPI_API_TOKEN}`,
-          },
-        });
-
-        const json = await res.json();
-        setOrder(json.data);
-        setShowPaymentPopup(true);
-      } catch (err) {
-        console.error('Ошибка загрузки заказа:', err);
-      }
-    }
-
-    if (id) fetchOrder();
-  }, [id]);
-
-  const handlePay = async (method: 'card' | 'sberbank' | 'sbp' | 'paypal') => {
-    if (!order) return;
-
-    try {
-      const res = await fetch('/api/checkout/pay', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          orderId: order.id,
-          method,
-        }),
-      });
-
-      const json = await res.json();
-
-      if (json.success) {
-        setShowPaymentPopup(false);
-        setShowDownloadPopup(true);
-      } else {
-        alert('Ошибка оплаты');
-      }
-    } catch (err) {
-      console.error('Ошибка при оплате:', err);
-      alert('Ошибка при выполнении оплаты');
-    }
-  };
-
-  const handleDownload = () => {
-    // Paid download IDs will come from the verified order entitlement endpoint.
-    // Never use a preview URL as an original or grant access from client state.
-    setShowDownloadPopup(false);
-  };
-
-  const handleCancel = () => {
-    if (from) {
-      router.push(from);
-    } else {
-      setShowPaymentPopup(false);
-    }
-  };
-
-  return (
-    <div className="p-6">
-      <h1 className="text-2xl font-bold mb-4">Оформление заказа</h1>
-
-      {!order && <p>Загрузка заказа...</p>}
-
-      {order && (
-        <div className="mb-6">
-          <p>Номер заказа: <strong>{order.id}</strong></p>
-          <p>Сумма: <strong>{order.attributes.amount} ₽</strong></p>
-          <p>Обоев: <strong>{order.attributes.wallpapers?.data?.length}</strong></p>
-        </div>
-      )}
-
-      <PaymentPopup
-        isOpen={showPaymentPopup}
-        onClose={handleCancel}
-        onPay={handlePay}
-      />
-
-      <DownloadPopup
-        isOpen={showDownloadPopup}
-        onDownload={handleDownload}
-      />
-    </div>
-  );
-}
 export default function CheckoutPage() {
-  return <section className="max-w-2xl mx-auto p-6 space-y-6">
-    <h1>Оформление заказа</h1>
-    <CommerceNotice action="checkout" />
-    <Link href="/cart" className="liquid-pill">Вернуться в корзину</Link>
-  </section>;
+  const {id}=useParams<{id:string}>();
+  const {restartCheckout}=useCart();
+  const [order,setOrder]=useState<ShopOrder|null>(null);
+  const [error,setError]=useState('');
+  const [loading,setLoading]=useState(true);
+  const [pending,setPending]=useState(false);
+  const [login,setLogin]=useState(false);
+  useEffect(()=>{
+    const controller=new AbortController();setLoading(true);setError('');setOrder(null);setLogin(false);
+    fetch('/api/checkout/'+encodeURIComponent(id),{cache:'no-store',signal:controller.signal})
+      .then(async res=>{const data=await res.json();if(controller.signal.aborted)return;
+        if(!res.ok){setLogin(res.status===401);setError(data.error||'Не удалось загрузить заказ.');return;}setOrder(data.order);})
+      .catch(()=>{if(!controller.signal.aborted)setError('Не удалось загрузить заказ. Попробуйте обновить страницу.');})
+      .finally(()=>{if(!controller.signal.aborted)setLoading(false);});
+    return()=>controller.abort();
+  },[id]);
+  async function cancel() {
+    if(pending)return;setPending(true);setError('');
+    try {
+      const res=await fetch('/api/checkout/'+encodeURIComponent(id),{method:'POST'});
+      const data=await res.json();
+      if(!res.ok){setError(data.error||'Не удалось отменить заказ.');return;}
+      setOrder(data.order);
+    }catch{setError('Не удалось отменить заказ. Попробуйте ещё раз.');}finally{setPending(false);}
+  }
+  return <div className="flex justify-center py-8 px-4"><AuthPanel title="Оформление заказа"><AuthStack>
+    {loading && <p className="auth-copy" role="status">Загружаем заказ…</p>}
+    {error && <AuthNotice kind="error">{error}</AuthNotice>}
+    {order && <div className="space-y-4">
+      <p className="auth-copy">{labels[order.state]} · № {order.id.slice(0,8)}</p>
+      <ul className="divide-y divide-white/15">{order.items.map(item=><li key={item.documentId} className="flex justify-between gap-4 py-3 text-sm">
+        <Link href={'/wallpaper/'+item.documentId} className="hover:underline">{item.title}</Link><span className="shrink-0">{money(item.unitKopecks)}</span>
+      </li>)}</ul>
+      <p className="flex justify-between gap-4 text-lg"><span>Итого</span><strong>{money(order.totalKopecks)}</strong></p>
+      {order.state==='awaiting_payment' && <>
+        <p className="auth-copy">Проверьте состав и стоимость. Оплата пока недоступна.</p>
+        <PaymentMethods/>
+        <button type="button" className="auth-link" onClick={cancel} disabled={pending}>{pending?'Отменяем…':'Отменить заказ'}</button>
+      </>}
+      {order.state==='expired' && <p className="auth-copy">Оформите заказ заново из корзины — стоимость будет проверена ещё раз.</p>}
+    </div>}
+    {login && <Link href="/?auth=popup" className="auth-button auth-button--primary">Войти в аккаунт</Link>}
+    <Link href="/cart" className="auth-button" onClick={()=>{if(order && ['cancelled','expired'].includes(order.state))restartCheckout();}}>{order && ['cancelled','expired'].includes(order.state)?'Оформить заново из корзины':'Вернуться в корзину'}</Link>
+  </AuthStack></AuthPanel></div>;
 }

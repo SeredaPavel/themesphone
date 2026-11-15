@@ -28,7 +28,7 @@ async function main() {
     return;
   }
   const options=process.argv.slice(3);
-  if (process.argv[2] !== 'start' || options.some(arg=>!['--smtp-yandex','--oauth'].includes(arg) && !arg.startsWith('--send-test='))) throw new Error('Usage: node scripts/local-auth.cjs setup|start [--smtp-yandex] [--oauth] [--send-test=recipient]');
+  if (process.argv[2] !== 'start' || options.some(arg=>!['--smtp-yandex','--oauth','--orders'].includes(arg) && !arg.startsWith('--send-test='))) throw new Error('Usage: node scripts/local-auth.cjs setup|start [--smtp-yandex] [--oauth] [--orders] [--send-test=recipient]');
   const recipients=options.filter(arg=>arg.startsWith('--send-test=')).map(arg=>arg.slice('--send-test='.length));
   if(recipients.length>1) throw new Error('Only one test recipient is allowed.');
   const testRecipient=recipients[0];
@@ -52,6 +52,8 @@ async function main() {
   }
   process.env.DOCUMENTATION_ENABLED = 'false';
   process.env.AUTH_CONFIGURE_EMAIL = 'false';
+  process.env.ORDERS_ENABLED = options.includes('--orders') ? 'true' : 'false';
+  process.env.PAYMENTS_ENABLED = 'false';
   process.env.OAUTH_ENABLED = 'false';
   if(options.includes('--oauth')) {
     const oauth=requireBackend('dotenv').parse(fs.readFileSync(path.join(root,'.local/oauth/backend.env')));

@@ -1,16 +1,15 @@
 'use client'
 
 import { createContext, useContext, useEffect, useState } from 'react'
-
-export type CartItem = {
-  id: number
-  title: string
-  imageUrl: string
-  price: number
-}
+import {normalizeCart,readCart} from '@/lib/cart-storage'
+import type {CartItem,StoredCart} from '@/lib/cart-storage'
+export type {CartItem} from '@/lib/cart-storage'
 
 type CartContextType = {
   cartItems: CartItem[]
+  isReady: boolean
+  checkoutKey: string
+  restartCheckout: () => void
   addToCart: (item: CartItem) => void
   removeFromCart: (id: number) => void
   clearCart: () => void
@@ -19,34 +18,41 @@ type CartContextType = {
 const CartContext = createContext<CartContextType | undefined>(undefined)
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
-  const [cartItems, setCartItems] = useState<CartItem[]>([])
+  const [cart,setCart]=useState<StoredCart>({version:2,items:[],checkoutKey:''})
+  const [isReady,setReady]=useState(false)
 
   // Загрузка из localStorage при инициализации
   useEffect(() => {
-    const stored = localStorage.getItem('cart')
-    if (stored) setCartItems(JSON.parse(stored))
+    let stored:string|null=null
+    try{stored=localStorage.getItem('cart')}catch{/* Storage can be disabled in the browser. */}
+    setCart(readCart(stored,()=>crypto.randomUUID()))
+    setReady(true)
   }, [])
 
   // Сохраняем изменения
   useEffect(() => {
-    localStorage.setItem('cart', JSON.stringify(cartItems))
-  }, [cartItems])
+    if(!isReady)return
+    try{localStorage.setItem('cart',JSON.stringify(cart))}catch{/* Keep the in-memory cart usable. */}
+  }, [cart,isReady])
 
   const addToCart = (item: CartItem) => {
-    setCartItems(prev => {
-      if (prev.find(p => p.id === item.id)) return prev
-      return [...prev, item]
+    if(!isReady)return
+    setCart(prev => {
+      const items=normalizeCart([...prev.items,item])
+      if(items.length===prev.items.length)return prev
+      return {version:2,items,checkoutKey:crypto.randomUUID()}
     })
   }
 
   const removeFromCart = (id: number) => {
-    setCartItems(prev => prev.filter(item => item.id !== id))
+    setCart(prev=>({...prev,items:prev.items.filter(item=>item.id!==id),checkoutKey:crypto.randomUUID()}))
   }
 
-  const clearCart = () => setCartItems([])
+  const clearCart = () => setCart({version:2,items:[],checkoutKey:crypto.randomUUID()})
+  const restartCheckout = () => setCart(prev=>({...prev,checkoutKey:crypto.randomUUID()}))
 
   return (
-    <CartContext.Provider value={{ cartItems, addToCart, removeFromCart, clearCart }}>
+    <CartContext.Provider value={{ cartItems:cart.items,checkoutKey:cart.checkoutKey,isReady,restartCheckout,addToCart,removeFromCart,clearCart }}>
       {children}
     </CartContext.Provider>
   )

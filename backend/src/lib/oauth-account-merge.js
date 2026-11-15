@@ -6,6 +6,7 @@ const USER='plugin::users-permissions.user';
 const FLOW='api::oauth-flow.oauth-flow';
 const IDENTITY='api::oauth-identity.oauth-identity';
 const ORDER='api::order.order';
+const SHOP_ORDER='api::shop-order.shop-order';
 const capability=value=>typeof value==='string' && /^[A-Za-z0-9_-]{43}$/.test(value);
 const hasPassword=user=>typeof user.password==='string' && user.password.length>0;
 
@@ -73,14 +74,19 @@ function createAccountMerge(strapi,providerApi,currentUser) {
   }
   // New owned resource types must get an explicit transfer policy before merging.
   function supportedRelations() {
-    const supported=new Set([ORDER,IDENTITY,'plugin::users-permissions.role']);
+    const supported=new Set([ORDER,SHOP_ORDER,IDENTITY,'plugin::users-permissions.role']);
     for(const [uid,model] of Object.entries(strapi.contentTypes)) {
       const owned=Object.entries(model.attributes || {}).some(([field,attr])=>attr.type==='relation' && attr.target===USER && !(uid===USER && field==='localizations'));
       if(!supported.has(uid) && owned) throw new OAuthError('merge_data_conflict',409);
     }
   }
   async function orders(userId) {
-    return query(ORDER).findMany({where:{users_permissions_user:{id:userId}},select:['id','documentId']});
+    const result=[];
+    for(const [uid,ownerField] of [[ORDER,'users_permissions_user'],[SHOP_ORDER,'owner']]) {
+      const rows=await query(uid).findMany({where:{[ownerField]:{id:userId}},select:['id','documentId']});
+      result.push(...rows.map(row=>({...row,uid,ownerField})));
+    }
+    return result;
   }
   return {
     lockUsers,
@@ -102,7 +108,7 @@ function createAccountMerge(strapi,providerApi,currentUser) {
         primaryEmail:accounts.primary.email || null,
         primaryIsCurrent:accounts.primary.id===accounts.current.id,
         providers:accounts.identities.map(identity=>identity.provider),
-        orderCount:new Set(transferred.map(order=>order.documentId || order.id)).size,
+        orderCount:new Set(transferred.map(order=>order.uid+':'+(order.documentId || order.id))).size,
         requiresPassword:hasPassword(accounts.current),
         verified:verified(flow,accounts),
         proofProviders:accounts.a.map(identity=>identity.provider).filter(provider=>providerApi.configured(provider)),
@@ -154,7 +160,7 @@ function createAccountMerge(strapi,providerApi,currentUser) {
         const {primary,secondary}=accounts;
         const movedOrders=await orders(secondary.id),existingOrders=await orders(primary.id);
         const secondaryIdentities=await identities(secondary.id);
-        for(const order of movedOrders) await query(ORDER).update({where:{id:order.id},data:{users_permissions_user:primary.id}});
+        for(const order of movedOrders) await query(order.uid).update({where:{id:order.id},data:{[order.ownerField]:primary.id}});
         for(const identity of secondaryIdentities) await query(IDENTITY).update({where:{id:identity.id},data:{user:primary.id}});
         const profile={resetPasswordToken:null,resetPasswordExpiresAt:null};
         for(const [field,max] of Object.entries({firstname:80,lastname:80,phone:32,billingAddress:300})) {

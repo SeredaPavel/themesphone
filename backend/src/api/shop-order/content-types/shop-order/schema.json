@@ -1,0 +1,18 @@
+{
+  "kind": "collectionType",
+  "collectionName": "shop_orders",
+  "info": {"singularName":"shop-order","pluralName":"shop-orders","displayName":"Shop order"},
+  "options": {"draftAndPublish":false},
+  "pluginOptions": {"content-manager":{"visible":false},"content-type-builder":{"visible":false}},
+  "attributes": {
+    "reference":{"type":"string","unique":true,"required":true},
+    "checkoutKey":{"type":"string","unique":true,"required":true,"private":true},
+    "requestHash":{"type":"string","required":true,"private":true},
+    "items":{"type":"json","required":true,"private":true},
+    "totalKopecks":{"type":"biginteger","required":true,"private":true},
+    "currency":{"type":"enumeration","enum":["RUB"],"default":"RUB","required":true},
+    "state":{"type":"enumeration","enum":["awaiting_payment","cancelled","paid"],"default":"awaiting_payment","required":true},
+    "expiresAt":{"type":"datetime","required":true},
+    "owner":{"type":"relation","relation":"manyToOne","target":"plugin::users-permissions.user","private":true}
+  }
+}

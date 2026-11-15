@@ -50,16 +50,7 @@ export default function WallpaperCard({id,documentId,returnTo,title,imageUrl,isF
   function add() {
     if(!user){setIsAuthOpen(true);return;}
     if(!price)return;
-    addToCart({id,title,imageUrl,price});setAdded(true);
-  }
-  // Kept for the payment stage; the visible purchase button remains disabled.
-  async function buy() {
-    if(!price)return;
-    try {
-      const res=await fetch('/api/checkout/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({data:{wallpapers:{connect:[id]},amount:price,paid:false,...(user?.id?{users_permission:user.id}:{})}})});
-      const json=await res.json();
-      if(json?.data?.id)router.push(`/checkout/${json.data.id}?from=${encodeURIComponent(window.location.pathname)}`);
-    } catch { /* Purchase stays disabled until the server order/payment flow is ready. */ }
+    addToCart({id,documentId,title,imageUrl,price});setAdded(true);
   }
 
   return <>
@@ -77,7 +68,7 @@ export default function WallpaperCard({id,documentId,returnTo,title,imageUrl,isF
             {isFree===true?(validOriginal(originalFile) && documentId
               ?<DownloadLink file={originalFile} wallpaper={documentId} returnTo={returnTo} tabIndex={expanded?0:-1} />
               :<button type="button" disabled title={commerceMessages.download} aria-describedby={availabilityId}><Download size={13} />Загрузить <small>скоро</small></button>):<>
-              <button type="button" onClick={buy} disabled title={commerceMessages.purchase} aria-describedby={availabilityId} className={styles.buy}><ShoppingBag size={13} />Купить <small>скоро</small></button>
+              <button type="button" disabled title={commerceMessages.purchase} aria-describedby={availabilityId} className={styles.buy}><ShoppingBag size={13} />Купить <small>скоро</small></button>
               <button type="button" onClick={add} tabIndex={expanded?0:-1} aria-label={added?`Добавлено: ${title}`:`В корзину: ${title}`} className={added?styles.added:''}>{added?<Check size={13} />:<ShoppingCart size={13} />}{added?'Добавлено':'В корзину'}</button>
             </>}
           </div>
