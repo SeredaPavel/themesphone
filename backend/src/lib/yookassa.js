@@ -14,7 +14,12 @@ function configuration(env=process.env){
       (url.protocol!=='https:'&&!(url.protocol==='http:'&&['localhost','127.0.0.1'].includes(url.hostname))))throw Error();
     origin=url.origin;
   }catch{throw new PaymentError('payments_unavailable');}
-  return {shopId:env.YOOKASSA_SHOP_ID,secret:env.YOOKASSA_SECRET_KEY,origin,mode:'test'};
+  const allowedOrigins=[origin];
+  for(const value of (env.PAYMENT_ALLOWED_ORIGINS||'').split(',').filter(Boolean)){
+    try{const url=new URL(value.trim());if(url.origin!==value.trim()||url.protocol!=='https:'||url.username||url.password)throw Error();allowedOrigins.push(url.origin);}
+    catch{throw new PaymentError('payments_unavailable');}
+  }
+  return {shopId:env.YOOKASSA_SHOP_ID,secret:env.YOOKASSA_SECRET_KEY,origin,allowedOrigins,mode:'test'};
 }
 function confirmationUrl(value){
   try{

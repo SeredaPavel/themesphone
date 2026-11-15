@@ -31,7 +31,7 @@ module.exports = ({ strapi }) => {
     }),
     startPayment:handle((ctx,id)=>{
       if(Object.keys(ctx.query).length||!ctx.request.body||Object.keys(ctx.request.body).length)throw new OrderError('invalid_order');
-      return payments.start(id,ctx.params.id);
+      return payments.start(id,ctx.params.id,ctx.get('x-storefront-origin')||undefined);
     }),
     paymentStatus:handle((ctx,id)=>{
       if(Object.keys(ctx.query).length)throw new OrderError('invalid_order');

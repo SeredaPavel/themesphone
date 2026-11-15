@@ -50,8 +50,10 @@ function createPayments(strapi,options={}){
     });
   }
   return {
-    async start(userId,reference){
+    async start(userId,reference,returnOrigin){
       const cfg=config();
+      const origin=returnOrigin||cfg.origin;
+      if(!(cfg.allowedOrigins||[cfg.origin]).includes(origin))throw new PaymentError('invalid_payment_origin',400);
       const attempt=await owned(userId,reference,async row=>{
         const existing=await payments().findOne({where:{orderReference:reference}});
         if(existing){
@@ -61,7 +63,7 @@ function createPayments(strapi,options={}){
         if(row.state!=='awaiting_payment'||new Date(row.expiresAt).getTime()<=Date.now())throw new PaymentError('order_not_payable',409);
         const attemptId=randomUUID();
         const requestBody={amount:{value:amount(Number(row.totalKopecks)),currency:'RUB'},capture:true,
-          confirmation:{type:'redirect',return_url:cfg.origin+'/checkout/'+row.reference},
+          confirmation:{type:'redirect',return_url:origin+'/checkout/'+row.reference},
           description:'ThemesPhone · заказ '+row.reference,
           metadata:{order_id:row.reference,attempt_id:attemptId}};
         return payments().create({data:{orderReference:row.reference,attemptId,shopId:cfg.shopId,mode:'test',state:'creating',requestBody}});

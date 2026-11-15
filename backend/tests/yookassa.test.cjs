@@ -6,6 +6,8 @@ const {configuration,confirmationUrl,amount,validatePayment,createYooKassa}=requ
 const env={PAYMENTS_ENABLED:'true',PAYMENT_PROVIDER:'yookassa',YOOKASSA_MODE:'test',YOOKASSA_SHOP_ID:'123',YOOKASSA_SECRET_KEY:'test_fixture',PAYMENT_RETURN_ORIGIN:'http://127.0.0.1:3100'};
 test('payment configuration refuses live keys, disabled mode and untrusted return URLs',()=>{
   assert.equal(configuration(env).mode,'test');
+  assert.ok(configuration({...env,PAYMENT_ALLOWED_ORIGINS:'https://themesphone.ru,https://themesphone.com'}).allowedOrigins.includes('https://themesphone.com'));
+  assert.throws(()=>configuration({...env,PAYMENT_ALLOWED_ORIGINS:'https://themesphone.com/redirect'}));
   for(const fields of [{PAYMENTS_ENABLED:'false'},{YOOKASSA_MODE:'live'},{YOOKASSA_SECRET_KEY:'live_key'},{PAYMENT_RETURN_ORIGIN:'http://example.com'},{PAYMENT_RETURN_ORIGIN:'https://example.com/path'},{PAYMENT_RETURN_ORIGIN:'https://user:password@example.com/'}])assert.throws(()=>configuration({...env,...fields}));
   assert.equal(amount(29901),'299.01');for(const value of [-1,0,1.2,NaN])assert.throws(()=>amount(value));
 });

@@ -73,7 +73,7 @@ test('payment BFF passes the session and stored order ID only, rejects forged re
   const payment={state:'pending',test:true,confirmationUrl:'https://yoomoney.ru/api-pages/v2/payment-confirm/epl?orderId=fixture'};
   const expected=order();
   mock.method(globalThis,'fetch',async(url,options)=>{
-    assert.equal(url,'http://cms:1337/api/shop-orders/'+ref+'/payment');assert.equal(options.headers.Authorization,'Bearer user.session.jwt');assert.deepEqual(JSON.parse(options.body),{});
+    assert.equal(url,'http://cms:1337/api/shop-orders/'+ref+'/payment');assert.equal(options.headers.Authorization,'Bearer user.session.jwt');assert.equal(options.headers['X-Storefront-Origin'],'https://shop.example');assert.deepEqual(JSON.parse(options.body),{});
     return Response.json({order:expected,payment});
   });
   const valid=await checkoutPayment(request({}),ref);assert.equal(valid.status,200);assert.deepEqual(await valid.json(),{order:expected,payment});

@@ -62,7 +62,7 @@ async function cms(req:Request,route:string,method='GET',data?:unknown,payment=f
   try {
     if(!process.env.STRAPI_API_URL)throw Error('Missing CMS');
     const response=await fetch(process.env.STRAPI_API_URL.replace(/\/$/,'')+'/api/'+route,{
-      method,headers:{Authorization:'Bearer '+token,...(data!==undefined?{'Content-Type':'application/json'}:{})},
+      method,headers:{Authorization:'Bearer '+token,...(data!==undefined?{'Content-Type':'application/json'}:{}),...(payment&&method==='POST'?{'X-Storefront-Origin':req.headers.get('origin')||''}:{})},
       ...(data!==undefined?{body:JSON.stringify(data)}:{}),cache:'no-store',redirect:'error',signal:AbortSignal.timeout(payment?45000:10000),
     });
     const value=await response.json();
