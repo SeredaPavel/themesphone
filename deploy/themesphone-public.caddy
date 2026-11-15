@@ -51,6 +51,33 @@ themesphone.ru, www.themesphone.ru, themesphone.com, www.themesphone.com {
             path /api/connect/google /api/connect/yandex /api/connect/telegram /api/auth/oauth/register /api/account/connections
         }
         reverse_proxy @oauth_write themesphone-frontend:3000
+        @checkout_start {
+            method POST
+            path /api/checkout/start
+            expression `{http.request.uri}.matches('^/api/checkout/start([?]|$)')`
+        }
+        request_body @checkout_start {
+            max_size 8KB
+        }
+        reverse_proxy @checkout_start themesphone-frontend:3000
+        @checkout_order {
+            method GET POST
+            path_regexp checkout_order ^/api/checkout/[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}(/payment)?$
+            expression `{http.request.uri}.matches('^/api/checkout/[0-9a-f-]+(/payment)?([?]|$)')`
+        }
+        request_body @checkout_order {
+            max_size 8KB
+        }
+        reverse_proxy @checkout_order themesphone-frontend:3000
+        @payment_webhook {
+            method POST
+            path /api/payments/yookassa/webhook
+            expression `{http.request.uri}.matches('^/api/payments/yookassa/webhook([?]|$)')`
+        }
+        request_body @payment_webhook {
+            max_size 32KB
+        }
+        reverse_proxy @payment_webhook themesphone-frontend:3000
         @unfinished path /api /api/*
         header @unfinished Content-Type "application/json; charset=utf-8"
         respond @unfinished `{"error":"Функция временно недоступна: сайт в разработке."}` 410

@@ -1,0 +1,17 @@
+{
+  "kind":"collectionType","collectionName":"shop_payments",
+  "info":{"singularName":"shop-payment","pluralName":"shop-payments","displayName":"Shop payment"},
+  "options":{"draftAndPublish":false},
+  "pluginOptions":{"content-manager":{"visible":false},"content-type-builder":{"visible":false}},
+  "attributes":{
+    "orderReference":{"type":"string","unique":true,"required":true,"private":true},
+    "attemptId":{"type":"string","unique":true,"required":true,"private":true},
+    "providerId":{"type":"string","unique":true,"private":true},
+    "shopId":{"type":"string","required":true,"private":true},
+    "mode":{"type":"enumeration","enum":["test"],"required":true,"private":true},
+    "state":{"type":"enumeration","enum":["creating","pending","waiting_for_capture","succeeded","canceled"],"default":"creating","required":true,"private":true},
+    "requestBody":{"type":"json","required":true,"private":true},
+    "confirmationUrl":{"type":"text","private":true},
+    "checkedAt":{"type":"datetime","private":true}
+  }
+}

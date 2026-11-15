@@ -30,6 +30,8 @@ async function main(){
   process.chdir(backend);
   const app=requireBackend('@strapi/strapi').createStrapi({appDir:backend,distDir:backend});
   const {ORDER,createOrders}=require('../backend/src/lib/shop-orders');
+  const {PAYMENT,createPayments}=require('../backend/src/lib/shop-payments');
+  const {PaymentError}=require('../backend/src/lib/yookassa');
   const {FILE,WALLPAPER}=require('../backend/src/lib/wallpaper-files');
   const USER='plugin::users-permissions.user',IDENTITY='api::oauth-identity.oauth-identity',FLOW='api::oauth-flow.oauth-flow';
   const users=[],docs=[],files=[],flows=[],identities=[];
@@ -108,16 +110,53 @@ async function main(){
     assert.equal((await createOrders(app).findOne(owner.id,oauthOrder.id)).id,oauthOrder.id);
     await assert.rejects(createOrders(app).create(oauth.id,input()),error=>error.code==='login_required');
     assert.ok([401,403].includes((await http('GET','shop-orders/'+oauthOrder.id,undefined,oauth.id)).status));
+    phase='idempotent payments and hostile notifications';
+    const cfg={shopId:'123',origin:'http://127.0.0.1:3100',mode:'test'};
+    const byKey=new Map(),byId=new Map();let loseResponse=true;
+    const fake={checkShop:async()=>{},create:async(body,key)=>{
+      let value=byKey.get(key);
+      if(!value){value={id:crypto.randomUUID(),test:true,paid:false,status:'pending',recipient:{account_id:cfg.shopId},amount:body.amount,metadata:body.metadata,confirmation:{confirmation_url:'https://yoomoney.ru/api-pages/v2/payment-confirm/epl?orderId='+key}};byKey.set(key,value);byId.set(value.id,value);}
+      if(loseResponse){loseResponse=false;throw new PaymentError('payment_provider_unavailable');}return structuredClone(value);
+    },get:async id=>structuredClone(byId.get(id))};
+    const checkout=createPayments(app,{config:cfg,api:fake});
+    const paymentOrder=await createOrders(app).create(owner.id,input());
+    await assert.rejects(checkout.start(other.id,paymentOrder.id),error=>error.code==='order_not_found');assert.equal(byKey.size,0);
+    await assert.rejects(checkout.start(owner.id,paymentOrder.id),error=>error.code==='payment_provider_unavailable');
+    await assert.rejects(createOrders(app).cancel(owner.id,paymentOrder.id),error=>error.code==='payment_in_progress');
+    const [paymentA,paymentB]=await Promise.all([checkout.start(owner.id,paymentOrder.id),checkout.start(owner.id,paymentOrder.id)]);
+    assert.equal(byKey.size,1);assert.equal(paymentA.payment.confirmationUrl,paymentB.payment.confirmationUrl);
+    const provider=[...byId.values()][0];
+    const notification={type:'notification',event:'payment.succeeded',object:{id:provider.id,status:'succeeded',paid:true}};
+    await checkout.webhook(notification);
+    assert.equal((await createOrders(app).findOne(owner.id,paymentOrder.id)).state,'awaiting_payment');
+    provider.status='succeeded';provider.paid=true;
+    const originalAmount=provider.amount;provider.amount={value:'0.01',currency:'RUB'};
+    await assert.rejects(checkout.webhook(notification),error=>error.code==='payment_response_invalid');
+    assert.equal((await createOrders(app).findOne(owner.id,paymentOrder.id)).state,'awaiting_payment');provider.amount=originalAmount;
+    await Promise.all([checkout.webhook(notification),checkout.webhook(notification)]);
+    assert.equal((await createOrders(app).findOne(owner.id,paymentOrder.id)).state,'test_paid');
+    const success=await checkout.refresh(owner.id,paymentOrder.id);assert.equal(success.payment.test,true);assert.equal(success.order.state,'test_paid');
+    const cancelOrder=await createOrders(app).create(owner.id,input());await checkout.start(owner.id,cancelOrder.id);
+    const last=[...byId.values()].at(-1);last.status='canceled';
+    await checkout.webhook({type:'notification',event:'payment.canceled',object:{id:last.id}});
+    assert.equal((await createOrders(app).findOne(owner.id,cancelOrder.id)).state,'cancelled');
+    assert.equal((await http('POST','payment-notifications/yookassa',notification,null)).status,403);
+    assert.equal((await http('POST','shop-orders/'+paymentOrder.id+'/payment',{},other.id)).status,503);
+    assert.equal((await http('GET','wallpaper-files/'+stored.items[0].originalFileId+'/download',undefined,owner.id)).status,403);
     phase='disabled flag and paid downloads remain closed';
     process.env.ORDERS_ENABLED='false';assert.equal((await http('POST','shop-orders',input())).status,503);
     assert.equal((await http('GET','shop-orders/'+oauthOrder.id)).status,200);
     assert.equal((await http('GET','wallpaper-files/'+stored.items[0].originalFileId+'/download',undefined,null)).status,403);
-    console.log('PASS: ownership, server totals, retries/concurrency, immutable snapshot, cancellation, retired CRUD, BFF, profile merge and disabled payments.');
+    console.log('PASS: server orders, profile merge, concurrent payment retries, lost response, forged/replayed notifications, canonical validation, cancellation and no live entitlement from test payment.');
   }finally{
     if(loaded){
       for(const key of flows)await app.db.query(FLOW).delete({where:{key}});
       for(const id of identities)await app.db.query(IDENTITY).delete({where:{id}});
-      for(const id of users)await app.db.query(ORDER).deleteMany({where:{owner:{id}}});
+      for(const id of users){
+        const owned=await app.db.query(ORDER).findMany({where:{owner:{id}},select:['reference']});
+        if(owned.length)await app.db.query(PAYMENT).deleteMany({where:{orderReference:{$in:owned.map(row=>row.reference)}}});
+        await app.db.query(ORDER).deleteMany({where:{owner:{id}}});
+      }
       for(const id of files)await app.db.query(FILE).delete({where:{id}});
       for(const documentId of docs)await app.documents(WALLPAPER).delete({documentId});
       for(const id of users)await app.db.query(USER).delete({where:{id}});

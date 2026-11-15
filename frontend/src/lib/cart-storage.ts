@@ -1,5 +1,5 @@
 export type CartItem={id:number; documentId?:string; title:string; imageUrl:string; price:number};
-export type StoredCart={version:2; items:CartItem[]; checkoutKey:string};
+export type StoredCart={version:2; items:CartItem[]; checkoutKey:string; completedOrders?:string[]};
 const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 export function normalizeCart(value:unknown):CartItem[] {
   if(!Array.isArray(value))return [];
@@ -19,6 +19,16 @@ export function normalizeCart(value:unknown):CartItem[] {
 export function readCart(text:string|null,newKey:()=>string):StoredCart {
   let value;
   try {value=text && text.length<=150000?JSON.parse(text):null;}catch{value=null;}
+  const completedOrders=Array.isArray(value?.completedOrders)?Array.from(new Set<string>(value.completedOrders.filter((id:unknown):id is string=>typeof id==='string'&&uuid.test(id)))).slice(-200):[];
   return {version:2,items:normalizeCart(Array.isArray(value)?value:value?.version===2?value.items:null),
+    ...(completedOrders.length?{completedOrders}:{}),
     checkoutKey:value?.version===2 && typeof value.checkoutKey==='string' && uuid.test(value.checkoutKey)?value.checkoutKey:newKey()};
+}
+
+export function completeCartOrder(cart:StoredCart,order:{id:string;state:string;items:{documentId:string}[]},newKey:()=>string):StoredCart {
+  if(!['paid','test_paid'].includes(order.state)||!uuid.test(order.id)||!Array.isArray(order.items)||!order.items.length||order.items.length>30||
+    order.items.some(item=>typeof item.documentId!=='string'||!/^[a-z0-9]{24}$/.test(item.documentId))||cart.completedOrders?.includes(order.id))return cart;
+  const purchased=new Set(order.items.map(item=>item.documentId));
+  const items=cart.items.filter(item=>!item.documentId||!purchased.has(item.documentId));
+  return {...cart,items,checkoutKey:items.length===cart.items.length?cart.checkoutKey:newKey(),completedOrders:[...(cart.completedOrders||[]),order.id].slice(-200)};
 }

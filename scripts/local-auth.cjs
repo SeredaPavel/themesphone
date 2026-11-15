@@ -28,7 +28,7 @@ async function main() {
     return;
   }
   const options=process.argv.slice(3);
-  if (process.argv[2] !== 'start' || options.some(arg=>!['--smtp-yandex','--oauth','--orders'].includes(arg) && !arg.startsWith('--send-test='))) throw new Error('Usage: node scripts/local-auth.cjs setup|start [--smtp-yandex] [--oauth] [--orders] [--send-test=recipient]');
+  if (process.argv[2] !== 'start' || options.some(arg=>!['--smtp-yandex','--oauth','--orders','--payments-test'].includes(arg) && !arg.startsWith('--send-test='))) throw new Error('Usage: node scripts/local-auth.cjs setup|start [--smtp-yandex] [--oauth] [--orders] [--payments-test] [--send-test=recipient]');
   const recipients=options.filter(arg=>arg.startsWith('--send-test=')).map(arg=>arg.slice('--send-test='.length));
   if(recipients.length>1) throw new Error('Only one test recipient is allowed.');
   const testRecipient=recipients[0];
@@ -52,8 +52,21 @@ async function main() {
   }
   process.env.DOCUMENTATION_ENABLED = 'false';
   process.env.AUTH_CONFIGURE_EMAIL = 'false';
-  process.env.ORDERS_ENABLED = options.includes('--orders') ? 'true' : 'false';
+  process.env.ORDERS_ENABLED = options.includes('--orders')||options.includes('--payments-test') ? 'true' : 'false';
   process.env.PAYMENTS_ENABLED = 'false';
+  if(options.includes('--payments-test')){
+    const payments=requireBackend('dotenv').parse(fs.readFileSync(path.join(root,'.local/payments/backend.env')));
+    if(payments.YOOKASSA_MODE!=='test'||payments.PAYMENTS_ENABLED!=='false')throw Error('Use the saved disabled test payment configuration.');
+    const frontPath=path.join(root,'.local/payments/frontend.env');
+    let bridge=fs.existsSync(frontPath)?requireBackend('dotenv').parse(fs.readFileSync(frontPath)).PAYMENT_WEBHOOK_BRIDGE_SECRET:null;
+    if(!bridge){bridge=crypto.randomBytes(32).toString('base64url');fs.writeFileSync(frontPath,'PAYMENT_WEBHOOK_BRIDGE_SECRET='+bridge+'\n',{flag:'wx',mode:0o600});}
+    Object.assign(process.env,{PAYMENTS_ENABLED:'true',PAYMENT_PROVIDER:'yookassa',YOOKASSA_MODE:'test',
+      YOOKASSA_SHOP_ID:payments.YOOKASSA_SHOP_ID,YOOKASSA_SECRET_KEY:payments.YOOKASSA_SECRET_KEY,
+      PAYMENT_RETURN_ORIGIN:'http://127.0.0.1:3100',PAYMENT_WEBHOOK_BRIDGE_SECRET:bridge,
+      WALLPAPER_ORIGINALS_DIR:path.join(root,'.local/originals')});
+    require('../backend/src/lib/yookassa').configuration();
+    console.log('Local YooKassa test mode enabled; live keys and real payments are refused.');
+  }
   process.env.OAUTH_ENABLED = 'false';
   if(options.includes('--oauth')) {
     const oauth=requireBackend('dotenv').parse(fs.readFileSync(path.join(root,'.local/oauth/backend.env')));

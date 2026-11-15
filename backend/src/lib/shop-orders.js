@@ -39,7 +39,7 @@ async function withOwner(strapi, userId, work) {
     await trx(strapi.db.metadata.get(USER).tableName).where('id', userId).forUpdate().first();
     const user = await strapi.db.query(USER).findOne({ where: { id: userId }, populate: ['role'] });
     if (!user || user.confirmed !== true || user.blocked || user.mergedIntoUserId || user.role?.type !== 'authenticated') throw new OrderError('login_required', 401);
-    return work(user);
+    return work(user,trx);
   });
 }
 function createOrders(strapi) {
@@ -93,9 +93,12 @@ function createOrders(strapi) {
     },
     async cancel(userId, id) {
       if (typeof id !== 'string' || !UUID.test(id)) throw new OrderError('order_not_found', 404);
-      return withOwner(strapi, userId, async () => {
+      return withOwner(strapi, userId, async (_user,trx) => {
+        const meta=strapi.db.metadata.get(ORDER);
+        await trx(meta.tableName).where(meta.attributes.reference.columnName,id).forUpdate().first();
         const row = await query().findOne({ where: { reference: id, owner: { id: userId } } });
         if (!row) throw new OrderError('order_not_found', 404);
+        if(await strapi.db.query('api::shop-payment.shop-payment').findOne({where:{orderReference:id}}))throw new OrderError('payment_in_progress',409);
         if (row.state !== 'awaiting_payment' && row.state !== 'cancelled') throw new OrderError('order_not_cancellable', 409);
         const result = row.state === 'cancelled' ? row : await query().update({ where: { id: row.id }, data: { state: 'cancelled' } });
         return publicOrder(result);
@@ -109,7 +112,7 @@ async function configureOrderPermissions(strapi) {
   for (const role of await strapi.db.query('plugin::users-permissions.role').findMany({ where: { type: { $in: ['public', 'authenticated'] } } })) {
     await permission.deleteMany({ where: { role: role.id, action: { $startsWith: 'api::order.' } } });
     if (role.type === 'public') await permission.deleteMany({ where: { role: role.id, action: { $startsWith: 'api::shop-order.' } } });
-    if (role.type === 'authenticated') for (const method of ['create', 'findOne', 'list', 'cancel']) {
+    if (role.type === 'authenticated') for (const method of ['create', 'findOne', 'list', 'cancel','startPayment','paymentStatus']) {
       const action = 'api::shop-order.shop-order.' + method;
       if (!await permission.findOne({ where: { action, role: role.id } })) await permission.create({ data: { action, role: role.id } });
     }

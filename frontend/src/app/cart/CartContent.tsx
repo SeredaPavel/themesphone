@@ -7,7 +7,7 @@ import {useState} from 'react';
 import {useAuthContext} from '@/context/AuthContext';
 import Link from 'next/link';
 
-export default function CartContent({ordersEnabled}:{ordersEnabled:boolean}) {
+export default function CartContent({ordersEnabled,paymentsEnabled}:{ordersEnabled:boolean;paymentsEnabled:boolean}) {
   const { cartItems, removeFromCart, clearCart,isReady,checkoutKey } = useCart();
   const {user}=useAuthContext();
   const [pending,setPending]=useState(false);
@@ -59,7 +59,7 @@ export default function CartContent({ordersEnabled}:{ordersEnabled:boolean}) {
         </div>
       </div>
 
-      <p className="auth-notice mb-6" id="cart-availability">{ordersEnabled?'Окончательный состав и стоимость будут показаны при оформлении. Оплата пока недоступна.':'Оформление и оплата пока недоступны. Товары можно сохранить в корзине.'}</p>
+      <p className="auth-notice mb-6" id="cart-availability">{!ordersEnabled?'Оформление и оплата пока недоступны. Товары можно сохранить в корзине.':paymentsEnabled?'Тестовый режим ЮKassa: реальные деньги не списываются. Окончательная стоимость будет показана при оформлении.':'Окончательный состав и стоимость будут показаны при оформлении. Оплата пока недоступна.'}</p>
       {error && <p className="auth-notice auth-notice--error mb-4" role="alert">{error}</p>}
 
       {!isReady?<p role="status">Загружаем корзину…</p>:cartItems.length === 0 ? (

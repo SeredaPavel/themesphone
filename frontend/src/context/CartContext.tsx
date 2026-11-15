@@ -1,7 +1,7 @@
 'use client'
 
-import { createContext, useContext, useEffect, useState } from 'react'
-import {normalizeCart,readCart} from '@/lib/cart-storage'
+import { createContext, useCallback, useContext, useEffect, useState } from 'react'
+import {normalizeCart,readCart,completeCartOrder} from '@/lib/cart-storage'
 import type {CartItem,StoredCart} from '@/lib/cart-storage'
 export type {CartItem} from '@/lib/cart-storage'
 
@@ -13,6 +13,7 @@ type CartContextType = {
   addToCart: (item: CartItem) => void
   removeFromCart: (id: number) => void
   clearCart: () => void
+  completeOrder: (order:{id:string;state:string;items:{documentId:string}[]}) => void
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined)
@@ -40,7 +41,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     setCart(prev => {
       const items=normalizeCart([...prev.items,item])
       if(items.length===prev.items.length)return prev
-      return {version:2,items,checkoutKey:crypto.randomUUID()}
+      return {...prev,items,checkoutKey:crypto.randomUUID()}
     })
   }
 
@@ -48,11 +49,14 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     setCart(prev=>({...prev,items:prev.items.filter(item=>item.id!==id),checkoutKey:crypto.randomUUID()}))
   }
 
-  const clearCart = () => setCart({version:2,items:[],checkoutKey:crypto.randomUUID()})
+  const clearCart = () => setCart(prev=>({...prev,items:[],checkoutKey:crypto.randomUUID()}))
   const restartCheckout = () => setCart(prev=>({...prev,checkoutKey:crypto.randomUUID()}))
+  const completeOrder=useCallback((order:{id:string;state:string;items:{documentId:string}[]})=>{
+    if(isReady)setCart(prev=>completeCartOrder(prev,order,()=>crypto.randomUUID()))
+  },[isReady])
 
   return (
-    <CartContext.Provider value={{ cartItems:cart.items,checkoutKey:cart.checkoutKey,isReady,restartCheckout,addToCart,removeFromCart,clearCart }}>
+    <CartContext.Provider value={{ cartItems:cart.items,checkoutKey:cart.checkoutKey,isReady,restartCheckout,completeOrder,addToCart,removeFromCart,clearCart }}>
       {children}
     </CartContext.Provider>
   )

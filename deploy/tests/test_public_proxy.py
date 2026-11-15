@@ -72,12 +72,18 @@ with tempfile.TemporaryDirectory() as folder:
             cases += [(front,path,'POST',410) for path in oauth_reads if path!='/api/account/connections']
             cases += [(front, path, 'GET', 410) for path in auth_paths]
             cases += [(front, '/api/me', 'POST', 410), (front, '/api/account/profile', 'POST', 410)]
+            checkout='/api/checkout/12345678-1234-4234-8234-123456789abc'
+            cases += [(front, '/api/checkout/start', 'POST', 200), (front, '/api/payments/yookassa/webhook', 'POST', 200)]
+            cases += [(front, path, method, 200) for path in [checkout, checkout+'/payment'] for method in ['GET','POST']]
+            cases += [(front, path, method, 410) for path in ['/api/checkout/start','/api/payments/yookassa/webhook'] for method in ['GET','PUT','DELETE']]
+            cases += [(front, path, method, 410) for path in [checkout,checkout+'/payment'] for method in ['PUT','DELETE']]
+            cases += [(front, path, 'POST', 410) for path in ['/api/checkout/1','/api/checkout/invalid/payment',checkout+'/other','/api/checkout/%31' + checkout.split('/')[-1][1:],'/api/checkout/start/extra','/api/payments/yookassa/webhook/extra']]
             cases += [(front, path, method, 410) for path in ['/api/checkout/pay', '/api/set-token', '/api/auth/set-token', '/api/connect/apple', '/api/oauth/bridge', '/api', '/API/download', '//api/download', '/%61pi/download', '/api%2Fdownload'] for method in ['GET', 'POST']]
             cases += [(front, path, method, 400) for path in ['/api/download', '/api/download?url=http://127.0.0.1', '/api/download?file=abc&url=http://127.0.0.1', '/api/download?file=abc&%75rl=http://127.0.0.1', '/api/download?file=../admin', '/api/download?file=abc&name=file'] for method in ['GET', 'HEAD']]
             cases += [(front, '/api/download?file=abc', method, 200) for method in ['GET', 'HEAD']]
             cases += [(front, '/api/download?file=abc', 'POST', 410)]
             cases += [(cms, '/wallpaper-originals', 'GET', 200), (cms, '/wallpaper-originals/abc', 'POST', 200), (cms, '/api/wallpaper-files/abc/download', 'GET', 410)]
-            cases += [(cms, path, method, 410) for path in ['/api/users', '/api/orders', '/api/auth/local', '/api/oauth/bridge', '/api/oauth-flows', '/api/oauth-identities', '/API/users', '//api/users', '/%61pi/users', '/api%2Fusers'] for method in ['GET', 'POST']]
+            cases += [(cms, path, method, 410) for path in ['/api/users', '/api/orders', '/api/shop-orders', '/api/shop-payments', '/api/payment-notifications/yookassa', '/api/auth/local', '/api/oauth/bridge', '/api/oauth-flows', '/api/oauth-identities', '/API/users', '//api/users', '/%61pi/users', '/api%2Fusers'] for method in ['GET', 'POST']]
             cases += [(cms, '/api/wallpapers', 'POST', 410), (front, '/api/top-wallpapers', 'POST', 410), (cms, '/documentation', 'GET', 404), (cms, '/documentation/v1', 'GET', 404)]
             for target, path, method, expected in cases:
                 actual = status(target, path, method)
